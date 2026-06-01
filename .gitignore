@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+telegram.env
 node_modules/
 target/
 dist/

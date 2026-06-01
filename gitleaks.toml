@@ -7,4 +7,6 @@ useDefault = true
 description = "Repository-local false positives"
 paths = [
   '''package-lock\.json$''',
+  '''(^|/)telegram\.env$''',
+  '''(^|/)[^/]*\.env$''',
 ]
