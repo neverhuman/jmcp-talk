@@ -16,3 +16,9 @@ JMCP is the system. JCP/1.0.0 is the protocol. JPCM is the backbone and transpor
 - Do not edit Rust crates, apps, package files, scripts, CI, schemas, or `tips/` unless a later instruction grants ownership.
 - Preserve other agents' edits. If a file has changed unexpectedly, inspect and merge rather than overwrite.
 
+## Jankurai
+
+<!-- jankurai generated adapter -->
+<!-- jankurai agent request v1 sha256:REPLACE_WITH_HASH -->
+
+Read `agent/JANKURAI_STANDARD.md` before Jankurai-scoped work. For explicit phase or MASTER_PLAN work only, read `agent/MASTER_PLAN.md` before `tips/phases/00-phase-index.md`; otherwise, user-provided implementation or handoff plans are controlling. Keep generated artifacts under their declared source commands.

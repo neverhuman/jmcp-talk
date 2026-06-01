@@ -4,6 +4,10 @@
 
 JMCP V1 runs as a local production-shaped system. The operator should be able to start the backend, inspect state in the React dashboard or Rust TUI, process Telegram text intake/approvals where configured, and replay events using embedded SQLite and the in-process event bus.
 
+## Release Gate
+
+Operations and release use the same local proofs. A candidate is ready only when the fast, conformance, security, rendered UX, and workspace build lanes all pass and the advisory score baseline is non-regressing. See `docs/release.md`.
+
 ## Startup Expectations
 
 Startup must:
@@ -31,3 +35,6 @@ If Telegram is unavailable, local dashboard and TUI approvals remain authoritati
 
 Operations should produce evidence suitable for incident review: component readiness, migration status, adapter registration, approval decisions, policy denials, replay runs, and audit export metadata.
 
+## Repair Evidence
+
+When a lane fails, keep the repair evidence local and reviewable. The expected evidence trail is the score report, the security artifact bundle, the UX proof bundle, and any replay or migration receipt written under `target/jankurai/`.

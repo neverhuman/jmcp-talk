@@ -1127,7 +1127,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "chrono",
  "jcp-core",
+ "jmcp-adapter-jeryu",
  "jmcp-app",
  "jmcp-domain",
  "serde",
@@ -1135,6 +1137,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tower-http 0.5.2",
+ "uuid",
 ]
 
 [[package]]
@@ -1143,12 +1146,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "hex",
  "jcp-core",
  "jmcp-attention",
  "jmcp-domain",
  "jmcp-store",
  "serde",
  "serde_json",
+ "sha2",
  "uuid",
 ]
 
@@ -1225,7 +1230,9 @@ dependencies = [
  "anyhow",
  "clap",
  "jcp-core",
+ "jmcp-approval-telegram",
  "reqwest",
+ "serde",
  "serde_json",
  "tokio",
 ]
@@ -1236,14 +1243,17 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "chrono",
  "clap",
  "jcp-core",
  "jmcp-api",
  "jmcp-app",
  "jmcp-approval-telegram",
+ "jmcp-domain",
  "jmcp-store",
  "serde_json",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

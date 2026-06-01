@@ -13,3 +13,7 @@ coverage/
 *.tmp
 *.swp
 .DS_Store
+# jankurai scaffold .gitignore
+# Keep Jankurai receipts local without hiding the rest of target/.
+target/jankurai/
+.jankurai/
