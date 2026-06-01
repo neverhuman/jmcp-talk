@@ -21,7 +21,7 @@ Claude must append proof and changed-path notes to `AGENT_CHAT.md` before handin
 
 ## Port Safety
 
-JMCP must not bind Jeryu protected or retired-sensitive ports: `2224`, `8787`, `8929`, `18787`, `18788`, or `19800`.
+JMCP must not bind Jeryu protected or retired-sensitive ports: `2224`, `8787`, `8799`, `8929`, `18787`, `18788`, or `19800`.
 
 JMCP defaults:
 

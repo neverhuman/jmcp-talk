@@ -1158,6 +1158,9 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "jmcp-domain",
+ "reqwest",
+ "serde",
+ "serde_json",
  "thiserror",
  "uuid",
 ]
@@ -1234,9 +1237,12 @@ dependencies = [
  "anyhow",
  "axum",
  "clap",
+ "jcp-core",
  "jmcp-api",
  "jmcp-app",
+ "jmcp-approval-telegram",
  "jmcp-store",
+ "serde_json",
  "tokio",
 ]
 

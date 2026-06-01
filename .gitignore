@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 telegram.env
+jmcp.telegram.offset
 node_modules/
 target/
 dist/
