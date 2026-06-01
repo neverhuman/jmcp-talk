@@ -1,0 +1,10 @@
+title = "JMCP gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Repository-local false positives"
+paths = [
+  '''package-lock\.json$''',
+]

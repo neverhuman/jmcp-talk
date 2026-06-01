@@ -1,0 +1,13 @@
+.artifacts/
+.env
+.env.*
+!.env.example
+node_modules/
+target/
+dist/
+coverage/
+/paper/build/
+*.log
+*.tmp
+*.swp
+.DS_Store
