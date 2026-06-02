@@ -1140,6 +1140,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "jmcp-adapter-speech"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "jmcp-api"
 version = "0.1.0"
 dependencies = [

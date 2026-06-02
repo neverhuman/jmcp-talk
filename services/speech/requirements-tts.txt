@@ -1,0 +1,6 @@
+# JMCP TTS sidecar — great text-to-speech on the local GPU/CPU.
+# Kokoro-82M (Apache-2.0, weights + code) via the `kokoro` package. Phonemization
+# uses bundled espeak-ng (espeakng-loader), so no system package is required.
+# Reuses the system torch (create the venv with --system-site-packages).
+kokoro==0.9.4
+soundfile==0.13.1

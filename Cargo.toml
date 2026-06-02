@@ -11,6 +11,7 @@ members = [
     "crates/jmcp-adapter-jailgun",
     "crates/jmcp-adapter-jeryu",
     "crates/jmcp-adapter-jekko",
+    "crates/jmcp-adapter-speech",
     "crates/jmcp-approval-telegram",
     "crates/jmcp-conformance",
     "apps/jmcpd",

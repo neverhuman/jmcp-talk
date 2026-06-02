@@ -1,0 +1,14 @@
+[package]
+name = "jmcp-adapter-speech"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true }
