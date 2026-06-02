@@ -8,6 +8,22 @@ JMCP V1 runs as a local production-shaped system. The operator should be able to
 
 Operations and release use the same local proofs. A candidate is ready only when the fast, conformance, security, rendered UX, and workspace build lanes all pass and the advisory score baseline is non-regressing. See `docs/release.md`.
 
+## Cost Budgets
+
+Operator-facing workflows should default to local-only execution. Any step that can spend money, burn external quota, or invoke a remote service must be budgeted in advance and documented in the lane recipe. If the lane cannot state a budget, it should not run by default.
+
+The local budget manifest is `agent/cost-budget.toml`. Run `just cost-budget` before any release or external lane and retain `target/jankurai/cost-budget.json` with the other receipts.
+
+## Stop Conditions
+
+Stop an operations lane immediately if:
+
+- the proof diverges from the documented local path;
+- a side effect cannot be replayed or safely skipped;
+- the operator cannot capture a receipt for the failure;
+- the repair requires hidden state, an untracked environment variable, or a manual portal action that cannot be reproduced.
+- `JMCP_COST_KILL_SWITCH=1` is set, a quota cap in `agent/cost-budget.toml` is exceeded, or an undeclared paid tool appears.
+
 ## Startup Expectations
 
 Startup must:
@@ -37,4 +53,6 @@ Operations should produce evidence suitable for incident review: component readi
 
 ## Repair Evidence
 
-When a lane fails, keep the repair evidence local and reviewable. The expected evidence trail is the score report, the security artifact bundle, the UX proof bundle, and any replay or migration receipt written under `target/jankurai/`.
+When a lane fails, keep the repair evidence local and reviewable. The expected evidence trail is the score report, the security artifact bundle, the UX proof bundle, `target/jankurai/cost-budget.json`, `target/jankurai/release-readiness.json`, and any replay or migration receipt written under `target/jankurai/`.
+
+Record the rerun command alongside the receipt. The rerun command should be one of the documented local commands in `docs/testing.md` or `docs/release.md`, not an ad hoc shell history entry.
