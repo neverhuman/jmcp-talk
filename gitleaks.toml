@@ -6,6 +6,7 @@ useDefault = true
 [allowlist]
 description = "Repository-local false positives"
 paths = [
+  '''^target/''',
   '''package-lock\.json$''',
   '''(^|/)telegram\.env$''',
   '''(^|/)[^/]*\.env$''',

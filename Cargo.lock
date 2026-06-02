@@ -1060,6 +1060,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "jmcp-adapter-jailgun"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "hex",
+ "jmcp-adapter-sdk",
+ "jmcp-domain",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "jmcp-adapter-jankurai"
 version = "0.1.0"
 dependencies = [

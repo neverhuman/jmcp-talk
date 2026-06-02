@@ -2,7 +2,7 @@
 
 ## Local Operating Model
 
-JMCP V1 runs as a local production-shaped system. The operator should be able to start the backend, inspect state in the React dashboard or Rust TUI, process Telegram text intake/approvals where configured, and replay events using embedded SQLite and the in-process event bus.
+JMCP V1 runs as a local production-shaped system. The operator should be able to start the backend, inspect state in the React dashboard or Rust TUI, process Telegram text intake/approvals where configured, follow voice/text intake where enabled, watch the attention inbox, promote memory, inspect inventory cards (tool, data, agent, and service cards), and replay incidents or quarantine state using embedded SQLite and the in-process event bus.
 
 ## Release Gate
 
@@ -33,6 +33,7 @@ Startup must:
 - initialize the in-process event bus;
 - register local adapters;
 - expose dashboard/TUI/API surfaces;
+- publish structured runtime/control-plane records for intake, attention, memory, inventory cards, and incident/quarantine state;
 - report readiness with component-level status.
 
 ## Shutdown Expectations
@@ -49,7 +50,7 @@ If Telegram is unavailable, local dashboard and TUI approvals remain authoritati
 
 ## Operator Evidence
 
-Operations should produce evidence suitable for incident review: component readiness, migration status, adapter registration, approval decisions, policy denials, replay runs, and audit export metadata.
+Operations should produce evidence suitable for incident review: component readiness, migration status, adapter registration, approval decisions, policy denials, voice/text intake receipts, attention inbox packets, memory promotion decisions, inventory card publications, quarantine state, replay runs, and audit export metadata.
 
 ## Repair Evidence
 

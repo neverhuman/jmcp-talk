@@ -8,6 +8,7 @@ members = [
     "crates/jmcp-api",
     "crates/jmcp-adapter-sdk",
     "crates/jmcp-adapter-jankurai",
+    "crates/jmcp-adapter-jailgun",
     "crates/jmcp-adapter-jeryu",
     "crates/jmcp-adapter-jekko",
     "crates/jmcp-approval-telegram",
