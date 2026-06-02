@@ -3,8 +3,8 @@
 JMCP is the Joint Master Control Plane. JCP/1.0.0 is the protocol, and JPCM is
 the replayable transport/profile layer. This repository contains the local V1
 runtime: Rust authority API, SQLite event store, CLI, Rust TUI, React cockpit,
-Telegram intake/approvals, and local adapter boundaries for Jankurai, Jeryu, and
-Jekko.
+Telegram intake/approvals, and local adapter boundaries for Jankurai, Jeryu,
+Jailgun, and Jekko.
 
 ## Operator Surfaces
 
@@ -59,6 +59,58 @@ cargo run -p jmcp-tui -- --once
 JMCP defaults must not bind Jeryu protected ports. Keep JMCP API on
 `127.0.0.1:18877` and cockpit on `127.0.0.1:15873` unless those ports are
 already occupied.
+
+## Jailgun Adapter
+
+JMCP submits `jailgun.run`, `jailgun.capture`, and `jailgun.deploy` work orders
+to Jailgun over HTTP with `POST /api/runs`. Configure the client explicitly:
+
+```dotenv
+JMCP_JAILGUN_URL=http://127.0.0.1:8787
+JMCP_JAILGUN_ALLOWED_URLS=http://127.0.0.1:8787
+JMCP_JAILGUN_TOKEN=redacted
+JMCP_JAILGUN_BIN=jailgun
+```
+
+`JMCP_JAILGUN_TOKEN` is forwarded as `x-jailgun-token`. `JMCP_JAILGUN_URL` must
+match one configured local submission policy entry exactly after trailing slash
+normalization. `JMCP_JAILGUN_BIN` is only for the current `jailgun.review_packet`
+CLI path.
+
+Run-agent work orders should carry the canonical inline shape:
+
+```json
+{
+  "request": {
+    "version": 1,
+    "prompt_ref": "jmcp://work-orders/example/prompt",
+    "prompt_file": "/path/to/prompt.txt"
+  }
+}
+```
+
+`request_path` remains accepted for compatibility callers and is read into the
+same HTTP JSON body. Jailgun run requests, review-packet requests, summaries,
+and review packets must all use `version: 1`; other versions fail closed.
+
+The Jekko ZYAL runner in `jmcp-adapter-jekko` submits only to
+`jekko port-run`; it does not invoke the Jailgun CLI. Jailgun work orders stay
+behind `jmcp-adapter-jailgun`, where `run-agent` uses HTTP and
+`review-packet` remains the bounded CLI compatibility path.
+
+## Autonomous Actions
+
+JMCP exposes a small full-auto catalog for bounded, evidence-oriented ZYAL work
+orders:
+
+- `GET /autonomous-actions`
+- `POST /autonomous-actions/:id/submit`
+
+The initial actions are committed under `agent/zyal/*.zyal` and submit
+`zyal.run` work orders through the normal signed JCP envelope path with
+`live=false`, fixed stage/time caps, and `submitted_by: "jmcp.full_auto"`
+metadata. They do not bypass leases, evidence recording, replay, approvals, or
+adapter health tracking.
 
 ## Telegram
 
