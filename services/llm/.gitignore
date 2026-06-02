@@ -1,0 +1,8 @@
+# Never commit the venv or model weights — they live in the HF cache / venv.
+.venv-llm/
+models/
+*.safetensors
+*.bin
+*.pt
+*.gguf
+__pycache__/

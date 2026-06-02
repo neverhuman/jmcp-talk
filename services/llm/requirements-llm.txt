@@ -1,0 +1,9 @@
+# JMCP local reasoning-model sidecar — vLLM serves an OpenAI-compatible /v1 API.
+#
+# Pinned to a CUDA-12 build: vLLM 0.9.2 pulls torch 2.7.0+cu126 (works with the
+# 570/CUDA-12.8 driver). transformers is pinned because newer 4.54+/5.x collide
+# with vLLM 0.9.2's config registration ("aimv2 already used"). Install with the
+# cu126 wheel index (see run-llm.sh). Weights download to the HF cache (outside
+# the repo) and are never committed.
+vllm==0.9.2
+transformers==4.53.3
