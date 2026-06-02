@@ -1164,6 +1164,7 @@ name = "jmcp-app"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "hex",
  "jcp-core",
@@ -1174,6 +1175,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror",
+ "tokio",
  "uuid",
 ]
 
@@ -1263,10 +1265,14 @@ name = "jmcpd"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "chrono",
  "clap",
  "jcp-core",
+ "jmcp-adapter-jankurai",
+ "jmcp-adapter-jekko",
+ "jmcp-adapter-sdk",
  "jmcp-api",
  "jmcp-app",
  "jmcp-approval-telegram",
