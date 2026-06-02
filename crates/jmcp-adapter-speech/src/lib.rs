@@ -19,10 +19,12 @@ const DEFAULT_ASR_URL: &str = "http://127.0.0.1:18878";
 const DEFAULT_TTS_URL: &str = "http://127.0.0.1:18901";
 
 fn env_url(key: &str, default: &str) -> String {
-    std::env::var(key)
-        .ok()
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| default.to_owned())
+    match std::env::var(key) {
+        Ok(value) if !value.trim().is_empty() => value,
+        Ok(_) => default.to_owned(),
+        Err(std::env::VarError::NotPresent) => default.to_owned(),
+        Err(std::env::VarError::NotUnicode(_)) => default.to_owned(),
+    }
 }
 
 /// Health snapshot of the ASR sidecar (`GET /health`).
@@ -51,6 +53,10 @@ pub struct Transcription {
     pub language: String,
     #[serde(default)]
     pub language_probability: f64,
+    /// Overall recognizer confidence in `0.0..=1.0` (mean per-segment), or
+    /// `None` when no speech segments were produced. Drives voice-approval gating.
+    #[serde(default)]
+    pub confidence: Option<f64>,
     #[serde(default)]
     pub duration: f64,
     #[serde(default)]
@@ -182,7 +188,20 @@ impl TtsClient {
         voice: Option<&str>,
         speed: Option<f32>,
     ) -> Result<Vec<u8>> {
-        let url = format!("{}/synthesize", self.base_url);
+        self.synthesize_as(text, voice, speed, AudioFormat::Wav)
+            .await
+    }
+
+    /// Synthesize `text` in the requested [`AudioFormat`]. Use
+    /// [`AudioFormat::OggOpus`] for Telegram voice notes (`sendVoice`).
+    pub async fn synthesize_as(
+        &self,
+        text: &str,
+        voice: Option<&str>,
+        speed: Option<f32>,
+        format: AudioFormat,
+    ) -> Result<Vec<u8>> {
+        let url = format!("{}/synthesize?format={}", self.base_url, format.query());
         let mut body = serde_json::json!({ "text": text });
         if let Some(voice) = voice {
             body["voice"] = serde_json::json!(voice);
@@ -203,6 +222,24 @@ impl TtsClient {
             .await
             .context("read TTS audio bytes")?;
         Ok(bytes.to_vec())
+    }
+}
+
+/// Audio container/codec the TTS sidecar emits.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AudioFormat {
+    /// WAV (24 kHz, PCM_16) — the default.
+    Wav,
+    /// OGG/Opus — required by Telegram `sendVoice`.
+    OggOpus,
+}
+
+impl AudioFormat {
+    fn query(self) -> &'static str {
+        match self {
+            AudioFormat::Wav => "wav",
+            AudioFormat::OggOpus => "ogg",
+        }
     }
 }
 

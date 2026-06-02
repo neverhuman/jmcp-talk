@@ -21,6 +21,7 @@ ASR_MODEL to nvidia/canary-* or parakeet via the local-speech inventory microtas
 once benchmarked — this server is model-agnostic over faster-whisper-loadable ids.
 """
 import json
+import math
 import os
 import tempfile
 import threading
@@ -113,10 +114,22 @@ class Handler(BaseHTTPRequestHandler):
             segments, info = model.transcribe(
                 tmp.name, language=language, beam_size=beam_size
             )
-            seg_list = [
-                {"start": round(s.start, 3), "end": round(s.end, 3), "text": s.text}
-                for s in segments
-            ]
+            seg_list = []
+            seg_confidences = []
+            for s in segments:
+                seg_list.append(
+                    {"start": round(s.start, 3), "end": round(s.end, 3), "text": s.text}
+                )
+                logprob = getattr(s, "avg_logprob", None)
+                if logprob is not None:
+                    # exp(avg token log-prob) -> a per-segment confidence in 0..1.
+                    seg_confidences.append(min(1.0, math.exp(float(logprob))))
+            # Overall recognizer confidence drives the voice-approval threshold.
+            confidence = (
+                round(sum(seg_confidences) / len(seg_confidences), 4)
+                if seg_confidences
+                else None
+            )
             elapsed = time.monotonic() - started
             text = "".join(s["text"] for s in seg_list).strip()
             duration = float(getattr(info, "duration", 0.0) or 0.0)
@@ -126,6 +139,7 @@ class Handler(BaseHTTPRequestHandler):
                     "text": text,
                     "language": info.language,
                     "language_probability": round(float(info.language_probability), 4),
+                    "confidence": confidence,
                     "duration": round(duration, 3),
                     "rtf": round(elapsed / duration, 4) if duration else None,
                     "segments": seg_list,

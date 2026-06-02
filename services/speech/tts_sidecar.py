@@ -22,7 +22,7 @@ import json
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 VOICE = os.environ.get("TTS_VOICE", "af_heart")
 LANG = os.environ.get("TTS_LANG", "a")
@@ -75,10 +75,19 @@ def _to_numpy(audio):
         return np.asarray(audio, dtype="float32")
 
 
-def _synthesize(text, voice, speed):
+# Output formats: WAV (default) and OGG/Opus (what Telegram voice notes require).
+_FORMATS = {
+    "wav": ("WAV", "PCM_16", "audio/wav"),
+    "ogg": ("OGG", "OPUS", "audio/ogg"),
+    "opus": ("OGG", "OPUS", "audio/ogg"),
+}
+
+
+def _synthesize(text, voice, speed, fmt):
     import numpy as np
     import soundfile as sf
 
+    sf_format, subtype, content_type = _FORMATS.get(fmt, _FORMATS["wav"])
     with _LOCK:
         pipeline = _STATE["pipeline"]
     chunks = [
@@ -86,8 +95,8 @@ def _synthesize(text, voice, speed):
     ]
     wav = np.concatenate(chunks) if chunks else np.zeros(1, dtype="float32")
     buf = io.BytesIO()
-    sf.write(buf, wav, SAMPLE_RATE, format="WAV", subtype="PCM_16")
-    return buf.getvalue(), len(wav) / SAMPLE_RATE
+    sf.write(buf, wav, SAMPLE_RATE, format=sf_format, subtype=subtype)
+    return buf.getvalue(), len(wav) / SAMPLE_RATE, content_type
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -121,9 +130,11 @@ class Handler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not found"})
 
     def do_POST(self):
-        if urlparse(self.path).path != "/synthesize":
+        parsed = urlparse(self.path)
+        if parsed.path != "/synthesize":
             self._json(404, {"error": "not found"})
             return
+        fmt = parse_qs(parsed.query).get("format", ["wav"])[0].lower()
         with _LOCK:
             pipeline = _STATE["pipeline"]
             error = _STATE["error"]
@@ -146,17 +157,17 @@ class Handler(BaseHTTPRequestHandler):
         speed = float(req.get("speed") or 1.0)
 
         try:
-            wav, seconds = _synthesize(text, voice, speed)
+            audio, seconds, content_type = _synthesize(text, voice, speed, fmt)
         except Exception as exc:  # noqa: BLE001
             self._json(500, {"error": f"{type(exc).__name__}: {exc}"})
             return
         self.send_response(200)
-        self.send_header("content-type", "audio/wav")
-        self.send_header("content-length", str(len(wav)))
+        self.send_header("content-type", content_type)
+        self.send_header("content-length", str(len(audio)))
         self.send_header("x-audio-seconds", f"{seconds:.3f}")
         self.send_header("x-voice", voice)
         self.end_headers()
-        self.wfile.write(wav)
+        self.wfile.write(audio)
 
 
 def main():
