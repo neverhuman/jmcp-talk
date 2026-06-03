@@ -16,24 +16,6 @@ JMCP is the system. JCP/1.0.0 is the protocol. JPCM is the backbone and transpor
 - Do not edit Rust crates, apps, package files, scripts, CI, schemas, or `tips/` unless a later instruction grants ownership.
 - Preserve other agents' edits. If a file has changed unexpectedly, inspect and merge rather than overwrite.
 
-## Agent-Readable Docs
-
-Before Jankurai, release, contract, data, or generated-artifact work, route through:
-
-1. `agent/owner-map.json`
-2. `agent/test-map.json`
-3. `agent/boundaries.toml`
-4. `agent/generated-zones.toml`
-5. `agent/proof-lanes.toml`
-6. `docs/architecture.md`
-7. `docs/boundaries.md`
-8. `docs/generated-zones.md`
-9. `docs/testing.md`
-10. `docs/security.md`
-11. `docs/release.md`
-12. `docs/release-process.md`
-13. `docs/audit-rubric.md`
-
 ## Jankurai
 
 <!-- jankurai generated adapter -->

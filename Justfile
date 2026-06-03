@@ -110,9 +110,6 @@ cost-budget:
 release-readiness:
     bash ops/ci/release-readiness.sh
 
-publish-main:
-    bash ops/ci/publish-main.sh
-
 authz-matrix:
     jankurai audit . --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md
 

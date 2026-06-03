@@ -60,27 +60,6 @@ JMCP defaults must not bind Jeryu protected ports. Keep JMCP API on
 `127.0.0.1:18877` and cockpit on `127.0.0.1:15873` unless those ports are
 already occupied.
 
-## Agent-Readable Docs
-
-Use these docs as the durable review surface before changing governance,
-contracts, adapters, data truth, release gates, or generated artifacts:
-
-- [Architecture](docs/architecture.md): runtime authority, event model,
-  approvals, and failure classes.
-- [Boundaries](docs/boundaries.md): Rust, SQL, protocol, UI, and adapter
-  ownership rules.
-- [Generated zones](docs/generated-zones.md): generated artifact rules and
-  contract-drift receipts.
-- [Testing](docs/testing.md): local proof lanes, adversarial fixtures, and
-  release gate coverage.
-- [Security](docs/security.md): secrets, approvals, replay safety, and supply
-  chain evidence.
-- [Release gate](docs/release.md) and
-  [release process doc](docs/release-process.md): version source, changelog,
-  proof artifacts, integrity/provenance evidence, and rollback.
-- [Audit rubric](docs/audit-rubric.md): Jankurai rule routing and finding
-  remediation expectations.
-
 ## Jailgun Adapter
 
 JMCP submits `jailgun.run`, `jailgun.capture`, and `jailgun.deploy` work orders
