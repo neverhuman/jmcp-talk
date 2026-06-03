@@ -1,4 +1,5 @@
-# JMCP ASR sidecar — master-grade speech-to-text on the local GPU.
+# JMCP ASR sidecar — realtime speech-to-text on the local GPU.
 # faster-whisper (MIT) over CTranslate2; PyAV bundles ffmpeg for decoding, so no
-# system ffmpeg is required. Whisper large-v3 weights are MIT (OpenAI).
+# system ffmpeg is required. distil-small.en is the realtime default; use
+# ASR_MODEL=large-v3 explicitly for accuracy runs.
 faster-whisper==1.2.1

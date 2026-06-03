@@ -6,10 +6,9 @@
 # 30B-A3B AWQ) into the shared HF cache. Binds 127.0.0.1:18902 by default (a
 # JMCP-safe port, never a Jeryu-protected one). Weights + venv are git-ignored.
 #
-# Defaults to the GPU-dedicated 30B (move speech to CPU first via dedicate-gpu.sh).
-# For the co-located 14B fallback that runs ALONGSIDE the GPU speech sidecars:
-#   LLM_MODEL=Qwen/Qwen2.5-Coder-14B-Instruct-AWQ LLM_SERVED_NAME=local/qwen2.5-coder-14b \
-#   LLM_GPU_UTIL=0.55 LLM_MAX_LEN=16384 ./run-llm.sh
+# Standalone defaults favor the 30B with a larger context. For Cockpit realtime
+# voice, use `services/llm/realtime-voice.sh`; it launches this script with
+# LLM_GPU_UTIL=0.80 and LLM_MAX_LEN=8192 so ASR/TTS can stay on CUDA.
 set -Eeuo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV="$HERE/.venv-llm"

@@ -6,8 +6,8 @@ The "brain": a strong local reasoning LLM served on the RTX 3090 via **vLLM** wi
 
 | | Model | Port | VRAM |
 |---|---|---|---|
-| **Primary (max reasoning, GPU-dedicated)** | `cpatonn/Qwen3-30B-A3B-Instruct-2507-AWQ-4bit` (MoE 30B/3B-active, Apache-2.0) | `127.0.0.1:18902` | ~20–21 GB @ 32K ctx |
-| **Fallback (co-located with speech)** | `Qwen/Qwen2.5-Coder-14B-Instruct-AWQ` | `127.0.0.1:18902` | ~12–13 GB (`LLM_GPU_UTIL=0.55`) |
+| **Realtime voice primary** | `cpatonn/Qwen3-30B-A3B-Instruct-2507-AWQ-4bit` (MoE 30B/3B-active, Apache-2.0) | `127.0.0.1:18902` | `LLM_GPU_UTIL=0.80`, ctx 8192, co-resident with ASR/TTS |
+| **Standalone reasoning** | same 30B | `127.0.0.1:18902` | default `run-llm.sh` profile, ctx 32768 |
 
 Port 18902 is JMCP-safe (never a Jeryu-protected port). Weights download to the HF
 cache (`~/.cache/huggingface`, outside the repo); the venv + any local weights are git-ignored.
@@ -15,19 +15,16 @@ cache (`~/.cache/huggingface`, outside the repo); the venv + any local weights a
 ## Run
 
 ```bash
-# 1. Dedicate the GPU to the model (move the speech sidecars to CPU):
-./services/llm/dedicate-gpu.sh dedicate
+# Realtime Cockpit voice stack: ASR distil-small.en + Kokoro + 30B.
+./services/llm/realtime-voice.sh
 
-# 2. Serve the 30B (first run installs vLLM + downloads ~17GB):
+# Standalone 30B reasoning only (first run installs vLLM + downloads ~17GB):
 ./services/llm/run-llm.sh
-#    fallback 14B co-located with GPU speech:
-#    ./services/llm/dedicate-gpu.sh colocate
-#    LLM_MODEL=Qwen/Qwen2.5-Coder-14B-Instruct-AWQ LLM_SERVED_NAME=local/qwen2.5-coder-14b \
-#      LLM_GPU_UTIL=0.55 LLM_MAX_LEN=16384 ./services/llm/run-llm.sh
 ```
 
 Config via env (see `run-llm.sh`): `LLM_MODEL`, `LLM_SERVED_NAME`, `LLM_PORT`,
-`LLM_GPU_UTIL`, `LLM_MAX_LEN`, `LLM_QUANT`.
+`LLM_GPU_UTIL`, `LLM_MAX_LEN`, `LLM_QUANT`. `realtime-voice.sh` sets
+`LLM_GPU_UTIL=0.80` and `LLM_MAX_LEN=8192` unless explicitly overridden.
 
 ## Verify
 
@@ -35,7 +32,7 @@ Config via env (see `run-llm.sh`): `LLM_MODEL`, `LLM_SERVED_NAME`, `LLM_PORT`,
 curl -s http://127.0.0.1:18902/health
 curl -s http://127.0.0.1:18902/v1/chat/completions -H 'content-type: application/json' \
   -d '{"model":"local/qwen3-30b-a3b","messages":[{"role":"user","content":"In one sentence, what is JMCP?"}]}'
-nvidia-smi   # vLLM owns the card; speech sidecars are on CPU
+nvidia-smi   # realtime voice should leave headroom for ASR/TTS
 ```
 
 ## Wire into JMCP / jnoccio

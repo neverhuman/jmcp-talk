@@ -4,10 +4,9 @@ A fully on-box, private voice assistant. The browser captures the microphone, a
 local ASR sidecar transcribes, a local reasoning LLM answers, and a local TTS
 sidecar speaks the reply back. No audio or text ever leaves the machine.
 
-The "brain" is a strong reasoning LLM (vLLM serving an OpenAI-compatible `/v1`
-API). The default is the GPU-dedicated 30B MoE; a smaller 14B alternative
-co-locates on the GPU alongside the speech sidecars when you want everything on
-one card at once.
+The fast path is the co-resident GPU profile launched by
+`services/llm/realtime-voice.sh`: Qwen3-30B-A3B at context 8192, ASR
+`distil-small.en` on CUDA float16 with beam 1, and Kokoro TTS on CUDA.
 
 ## 1. Architecture
 
@@ -15,11 +14,11 @@ one card at once.
 browser mic
    |  (continuous capture)
    v
-energy VAD  ──segments each utterance──>  local ASR  (faster-whisper, :18878)
+energy VAD  ──segments each utterance──>  local ASR  (distil-small.en, :18878)
    |                                            |
    |                                       transcript text
    v                                            v
-wake word "hey JMCP"  ── command ──>  local vLLM reasoning  (:18902)
+spoken command  ───────────────────>  local vLLM reasoning  (:18902)
                                             |
                                        one/two-sentence reply
                                             v
@@ -30,10 +29,9 @@ wake word "hey JMCP"  ── command ──>  local vLLM reasoning  (:18902)
 
 - The mic runs continuously in the browser. A lightweight energy VAD (RMS
   threshold) decides where each spoken utterance starts and ends.
-- While idle the assistant only acts when the transcript contains the wake word
-  (`hey jmcp`, with `hey jim cp`, `jmcp`, and `computer` also accepted). The
-  words after the wake word become the command; if you say only the wake word,
-  the next utterance is treated as the command.
+- Once the widget is active, each spoken turn is treated as a command. The
+  wake-word parser remains tested for compatibility, but the cockpit fast path
+  avoids an extra activation turn.
 - The command is sent to the local vLLM `/v1/chat/completions` endpoint with a
   short system prompt asking for one or two spoken sentences.
 - The reply is synthesized by the local TTS sidecar and played back.
@@ -41,27 +39,20 @@ wake word "hey JMCP"  ── command ──>  local vLLM reasoning  (:18902)
   capturing your next utterance.
 
 The widget is a floating mic control mounted only on the standalone cockpit. Its
-states are: voice off, listening (waiting for the wake word), armed (heard the
-wake word, capturing the command), transcribing, thinking, speaking.
+states are: voice off, listening, transcribing, thinking, speaking, and error.
 
 ## 2. Bring-up
 
 ```bash
-# 1. Dedicate the GPU to the reasoning model (moves speech sidecars to CPU):
-./services/llm/dedicate-gpu.sh dedicate
+# 1. Start the realtime GPU voice stack: ASR + TTS + Qwen3-30B-A3B.
+#    First run creates venvs and downloads weights into the shared HF cache.
+./services/llm/realtime-voice.sh
 
-# 2. Serve the 30B reasoning model. The first run installs vLLM and downloads
-#    ~17GB of weights into the shared HF cache (~/.cache/huggingface, git-ignored):
-./services/llm/run-llm.sh
-
-# 3. Start the cockpit web UI (defaults to 127.0.0.1:15873):
+# 2. Start the cockpit web UI (defaults to 127.0.0.1:15873):
 npm --workspace @jmcp/cockpit run dev
 ```
 
-Then open the cockpit in a browser, click the floating mic widget to start, and
-say:
-
-> "hey JMCP, &lt;your question&gt;"
+Then open the cockpit in a browser, click the floating mic widget to start, and speak.
 
 The widget shows what it heard and the spoken reply as text alongside the audio.
 
@@ -84,26 +75,17 @@ to start on any of those.
 
 ## 4. GPU / VRAM
 
-This box is a single RTX 3090 (24 GB). The 30B-A3B AWQ weights are ~17GB
-(~20–21 GB once the KV cache is included at 32K context), so the reasoning model
-wants the GPU to itself. `dedicate-gpu.sh dedicate` restarts the speech sidecars
-on CPU (faster-whisper int8 + Kokoro stay faster-than-real-time for short voice
-turns), freeing the whole card for vLLM.
+This box is a single RTX 3090 (24 GB). The realtime voice launcher keeps the
+30B-A3B AWQ model at `LLM_GPU_UTIL=0.80` and `LLM_MAX_LEN=8192`, leaving enough
+headroom for ASR `distil-small.en` and Kokoro TTS to stay on CUDA.
 
-When you would rather keep the speech sidecars on the GPU, run the co-located 14B
-alternative instead:
+For an explicit accuracy or isolation run, you can still move speech off the GPU
+or choose a larger ASR model manually:
 
 ```bash
-./services/llm/dedicate-gpu.sh colocate   # speech back on the GPU
-LLM_MODEL=Qwen/Qwen2.5-Coder-14B-Instruct-AWQ \
-LLM_SERVED_NAME=local/qwen2.5-coder-14b \
-LLM_GPU_UTIL=0.55 LLM_MAX_LEN=16384 \
-  ./services/llm/run-llm.sh
+./services/llm/dedicate-gpu.sh dedicate
+ASR_MODEL=large-v3 ASR_BEAM_SIZE=5 ./services/speech/run-asr.sh
 ```
-
-`dedicate-gpu.sh colocate` moves ASR and TTS back onto the GPU; the lower
-`LLM_GPU_UTIL=0.55` leaves room for both speech sidecars to share the card with
-the 14B model.
 
 ## 5. Configuration knobs
 
@@ -114,16 +96,19 @@ LLM sidecar (`services/llm/run-llm.sh`):
 | `LLM_MODEL` | `cpatonn/Qwen3-30B-A3B-Instruct-2507-AWQ-4bit` | model repo vLLM serves |
 | `LLM_SERVED_NAME` | `local/qwen3-30b-a3b` | name clients send as `model` |
 | `LLM_PORT` | `18902` | bind port |
-| `LLM_GPU_UTIL` | `0.92` | GPU memory fraction for vLLM |
-| `LLM_MAX_LEN` | `32768` | max context length |
+| `LLM_GPU_UTIL` | `0.92` (`0.80` in realtime launcher) | GPU memory fraction for vLLM |
+| `LLM_MAX_LEN` | `32768` (`8192` in realtime launcher) | max context length |
 | `LLM_QUANT` | _unset_ | force a quantization kernel (e.g. `awq_marlin`) |
 
 Speech device placement (`dedicate-gpu.sh` / `run-asr.sh` / `run-tts.sh`):
 
 | Env | Meaning |
 |---|---|
-| `ASR_DEVICE` | `cuda` (co-located) or `cpu` (dedicated mode) |
-| `TTS_DEVICE` | `auto`/`cuda` (co-located) or `cpu` (dedicated mode) |
+| `ASR_MODEL` | default `distil-small.en`; set `large-v3` only for accuracy overrides |
+| `ASR_DEVICE` | `cuda` in realtime launcher or `cpu` for dedicated/isolation mode |
+| `ASR_COMPUTE` | `float16` on CUDA, `int8` on CPU |
+| `ASR_BEAM_SIZE` | default `1`; set higher only for accuracy overrides |
+| `TTS_DEVICE` | `cuda` in realtime launcher, `auto` in standalone runner, or `cpu` for dedicated/isolation mode |
 
 Cockpit proxy targets (`apps/cockpit/vite.config.ts`) and voice model:
 
@@ -153,7 +138,10 @@ curl -s http://127.0.0.1:18902/v1/chat/completions \
 curl -s http://127.0.0.1:18878/health
 curl -s http://127.0.0.1:18901/health
 
-# GPU occupancy — in dedicated mode vLLM owns the card and speech is on CPU:
+# Round-trip check:
+./services/speech/selftest.sh
+
+# GPU occupancy — realtime mode should retain at least about 1 GB headroom:
 nvidia-smi
 ```
 

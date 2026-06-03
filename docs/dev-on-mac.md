@@ -49,8 +49,9 @@ The launchers auto-detect the device, so they "just work":
 
 - **ASR** (faster-whisper / CTranslate2) has **no Metal/MPS backend**, so the Mac
   default is `ASR_DEVICE=cpu ASR_COMPUTE=int8` (set automatically when `nvidia-smi`
-  is absent). large-v3 runs comfortably on M-series; for lower latency use a
-  smaller model: `ASR_MODEL=distil-large-v3` or `large-v3-turbo`.
+  is absent). The model default remains `distil-small.en` for parity with the
+  realtime CUDA profile. For explicit accuracy checks, override with
+  `ASR_MODEL=large-v3 ASR_BEAM_SIZE=5`.
 - **TTS** (Kokoro-82M, PyTorch) defaults to CPU. To try Metal: `TTS_DEVICE=mps
   ./services/speech/run-tts.sh` (most ops are MPS-supported; fall back to CPU if a
   kernel is missing).

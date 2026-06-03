@@ -17,6 +17,8 @@ coverage/
 # Keep Jankurai receipts local without hiding the rest of target/.
 target/jankurai/
 .jankurai/
+# generated harness runtime lock (local only)
+.claude/scheduled_tasks.lock
 # speech sidecars: ship the scripts, never the venv/models/caches
 .venv/
 .venv-*/

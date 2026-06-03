@@ -1,7 +1,8 @@
 //! Thin HTTP clients for the JMCP speech sidecars.
 //!
 //! The heavy CUDA/ML speech stack runs out-of-process in two Python sidecars
-//! (`services/speech/`): faster-whisper large-v3 for ASR and Kokoro-82M for TTS.
+//! (`services/speech/`): faster-whisper distil-small.en for realtime ASR and
+//! Kokoro-82M for TTS.
 //! This crate is the Rust side — exactly like [`jmcp_adapter_jekko`] shells out
 //! to a separate engine, these clients call the sidecars over localhost HTTP and
 //! never embed PyTorch/CUDA in the runtime.
@@ -33,9 +34,21 @@ pub struct AsrHealth {
     pub ok: bool,
     pub model: String,
     pub device: String,
+    #[serde(default)]
+    pub compute_type: Option<String>,
+    #[serde(default)]
+    pub beam_size: Option<u32>,
     pub loaded: bool,
     #[serde(default)]
+    pub warmed: bool,
+    #[serde(default)]
+    pub last_elapsed_ms: Option<f64>,
+    #[serde(default)]
+    pub last_warmup_ms: Option<f64>,
+    #[serde(default)]
     pub error: Option<String>,
+    #[serde(default)]
+    pub warm_error: Option<String>,
 }
 
 /// One transcribed segment with timestamps.
@@ -59,6 +72,8 @@ pub struct Transcription {
     pub confidence: Option<f64>,
     #[serde(default)]
     pub duration: f64,
+    #[serde(default)]
+    pub elapsed_ms: Option<f64>,
     #[serde(default)]
     pub rtf: Option<f64>,
     #[serde(default)]
@@ -137,11 +152,19 @@ pub struct TtsHealth {
     pub device: Option<String>,
     pub loaded: bool,
     #[serde(default)]
+    pub warmed: bool,
+    #[serde(default)]
     pub voice: Option<String>,
     #[serde(default)]
     pub sample_rate: Option<u32>,
     #[serde(default)]
+    pub last_elapsed_ms: Option<f64>,
+    #[serde(default)]
+    pub last_warmup_ms: Option<f64>,
+    #[serde(default)]
     pub error: Option<String>,
+    #[serde(default)]
+    pub warm_error: Option<String>,
 }
 
 /// Client for the Kokoro TTS sidecar.

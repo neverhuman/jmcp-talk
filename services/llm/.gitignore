@@ -1,6 +1,8 @@
 # Never commit the venv or model weights — they live in the HF cache / venv.
 .venv-llm/
+.venv-omni/
 models/
+*.wav
 *.safetensors
 *.bin
 *.pt

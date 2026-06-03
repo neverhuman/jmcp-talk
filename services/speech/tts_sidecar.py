@@ -7,9 +7,11 @@ ships commercially clean — unlike XTTS-v2 (non-commercial CPML). Phonemization
 uses the bundled espeak-ng via espeakng-loader, so no system package is needed.
 
 Endpoints
-  GET  /health      -> {ok, model, device, loaded, voice, sample_rate, error?}
+  GET  /health      -> {ok, model, device, loaded, warmed, voice, sample_rate,
+                         last_elapsed_ms?, error?}
   POST /synthesize  -> body JSON {text, voice?, speed?}
                        200 -> audio/wav bytes (24 kHz, PCM_16)
+                       header: x-tts-ms
 
 Config (env): TTS_VOICE=af_heart  TTS_LANG=a (American English)  TTS_DEVICE=auto
               TTS_BIND=127.0.0.1:18901  (a JMCP-safe port)
@@ -21,6 +23,7 @@ import io
 import json
 import os
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -30,7 +33,16 @@ DEVICE = os.environ.get("TTS_DEVICE", "auto")
 BIND = os.environ.get("TTS_BIND", "127.0.0.1:18901")
 SAMPLE_RATE = 24000
 
-_STATE = {"pipeline": None, "loaded": False, "error": None, "device": None}
+_STATE = {
+    "pipeline": None,
+    "loaded": False,
+    "warmed": False,
+    "error": None,
+    "warm_error": None,
+    "device": None,
+    "last_elapsed_ms": None,
+    "last_warmup_ms": None,
+}
 _LOCK = threading.Lock()
 
 
@@ -51,11 +63,25 @@ def _load_pipeline():
 
         device = _resolve_device()
         pipeline = KPipeline(lang_code=LANG, device=device)
+        warmed = False
+        warm_error = None
+        warmup_ms = None
+        try:
+            started = time.monotonic()
+            _render_audio(pipeline, "Ready.", VOICE, 1.0, "wav")
+            warmup_ms = round((time.monotonic() - started) * 1000, 1)
+            warmed = True
+        except Exception as exc:  # noqa: BLE001 - warmup is advisory; serving can proceed
+            warm_error = f"{type(exc).__name__}: {exc}"
         with _LOCK:
             _STATE["pipeline"] = pipeline
             _STATE["device"] = device
             _STATE["loaded"] = True
-        print(f"[tts] Kokoro loaded on {device} (voice={VOICE})", flush=True)
+            _STATE["warmed"] = warmed
+            _STATE["warm_error"] = warm_error
+            _STATE["last_warmup_ms"] = warmup_ms
+        warm_status = f", warmup={warmup_ms}ms" if warmed else f", warmup failed: {warm_error}"
+        print(f"[tts] Kokoro loaded on {device} (voice={VOICE}{warm_status})", flush=True)
     except Exception as exc:  # noqa: BLE001
         with _LOCK:
             _STATE["error"] = f"{type(exc).__name__}: {exc}"
@@ -83,13 +109,11 @@ _FORMATS = {
 }
 
 
-def _synthesize(text, voice, speed, fmt):
+def _render_audio(pipeline, text, voice, speed, fmt):
     import numpy as np
     import soundfile as sf
 
     sf_format, subtype, content_type = _FORMATS.get(fmt, _FORMATS["wav"])
-    with _LOCK:
-        pipeline = _STATE["pipeline"]
     chunks = [
         _to_numpy(audio) for _, _, audio in pipeline(text, voice=voice, speed=speed)
     ]
@@ -97,6 +121,12 @@ def _synthesize(text, voice, speed, fmt):
     buf = io.BytesIO()
     sf.write(buf, wav, SAMPLE_RATE, format=sf_format, subtype=subtype)
     return buf.getvalue(), len(wav) / SAMPLE_RATE, content_type
+
+
+def _synthesize(text, voice, speed, fmt):
+    with _LOCK:
+        pipeline = _STATE["pipeline"]
+    return _render_audio(pipeline, text, voice, speed, fmt)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -114,18 +144,20 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if urlparse(self.path).path == "/health":
             with _LOCK:
-                self._json(
-                    200,
-                    {
-                        "ok": _STATE["error"] is None,
-                        "model": "kokoro-82M",
-                        "device": _STATE["device"],
-                        "loaded": _STATE["loaded"],
-                        "voice": VOICE,
-                        "sample_rate": SAMPLE_RATE,
-                        "error": _STATE["error"],
-                    },
-                )
+                payload = {
+                    "ok": _STATE["error"] is None,
+                    "model": "kokoro-82M",
+                    "device": _STATE["device"],
+                    "loaded": _STATE["loaded"],
+                    "warmed": _STATE["warmed"],
+                    "voice": VOICE,
+                    "sample_rate": SAMPLE_RATE,
+                    "last_elapsed_ms": _STATE["last_elapsed_ms"],
+                    "last_warmup_ms": _STATE["last_warmup_ms"],
+                    "error": _STATE["error"],
+                    "warm_error": _STATE["warm_error"],
+                }
+            self._json(200, payload)
             return
         self._json(404, {"error": "not found"})
 
@@ -157,7 +189,11 @@ class Handler(BaseHTTPRequestHandler):
         speed = float(req.get("speed") or 1.0)
 
         try:
+            started = time.monotonic()
             audio, seconds, content_type = _synthesize(text, voice, speed, fmt)
+            elapsed_ms = round((time.monotonic() - started) * 1000, 1)
+            with _LOCK:
+                _STATE["last_elapsed_ms"] = elapsed_ms
         except Exception as exc:  # noqa: BLE001
             self._json(500, {"error": f"{type(exc).__name__}: {exc}"})
             return
@@ -165,6 +201,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("content-type", content_type)
         self.send_header("content-length", str(len(audio)))
         self.send_header("x-audio-seconds", f"{seconds:.3f}")
+        self.send_header("x-tts-ms", f"{elapsed_ms:.1f}")
         self.send_header("x-voice", voice)
         self.end_headers()
         self.wfile.write(audio)

@@ -14,7 +14,7 @@ wav="$(mktemp --suffix=.wav)"
 trap 'rm -f "$wav"' EXIT
 curl -sf -X POST "$TTS/synthesize" -H 'content-type: application/json' \
   -d "$(python3 -c 'import json,sys;print(json.dumps({"text":sys.argv[1]}))' "$PHRASE")" -o "$wav"
-heard="$(curl -sf -X POST --data-binary @"$wav" "$ASR/transcribe?language=en" \
+heard="$(curl -sf -X POST --data-binary @"$wav" "$ASR/transcribe?language=en&beam_size=${ASR_BEAM_SIZE:-1}" \
   -H 'content-type: audio/wav' | python3 -c 'import sys,json;print(json.load(sys.stdin)["text"])')"
 
 norm() { printf '%s' "$1" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9 ' | tr -s ' '; }

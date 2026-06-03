@@ -30,13 +30,18 @@ async fn asr_health_parses() {
     let url = stub_server(
         "200 OK",
         "application/json",
-        br#"{"ok":true,"model":"large-v3","device":"cuda","loaded":true,"error":null}"#.to_vec(),
+        br#"{"ok":true,"model":"distil-small.en","device":"cuda","compute_type":"float16","beam_size":1,"loaded":true,"warmed":true,"last_elapsed_ms":123.4,"last_warmup_ms":456.7,"error":null,"warm_error":null}"#.to_vec(),
     );
     let health = AsrClient::new(url).health().await.unwrap();
     assert!(health.ok);
     assert!(health.loaded);
-    assert_eq!(health.model, "large-v3");
+    assert!(health.warmed);
+    assert_eq!(health.model, "distil-small.en");
     assert_eq!(health.device, "cuda");
+    assert_eq!(health.compute_type.as_deref(), Some("float16"));
+    assert_eq!(health.beam_size, Some(1));
+    assert_eq!(health.last_elapsed_ms, Some(123.4));
+    assert_eq!(health.last_warmup_ms, Some(456.7));
 }
 
 #[tokio::test]
@@ -44,7 +49,7 @@ async fn asr_transcribe_parses_text_and_segments() {
     let url = stub_server(
         "200 OK",
         "application/json",
-        br#"{"text":"hello world","language":"en","language_probability":0.99,"confidence":0.88,"duration":1.5,"rtf":0.05,"segments":[{"start":0.0,"end":1.5,"text":"hello world"}]}"#.to_vec(),
+        br#"{"text":"hello world","language":"en","language_probability":0.99,"confidence":0.88,"duration":1.5,"elapsed_ms":75.2,"rtf":0.05,"segments":[{"start":0.0,"end":1.5,"text":"hello world"}]}"#.to_vec(),
     );
     let out = AsrClient::new(url)
         .transcribe(b"fake-wav".to_vec(), Some("en"))
@@ -53,6 +58,7 @@ async fn asr_transcribe_parses_text_and_segments() {
     assert_eq!(out.text, "hello world");
     assert_eq!(out.language, "en");
     assert_eq!(out.segments.len(), 1);
+    assert_eq!(out.elapsed_ms, Some(75.2));
     assert_eq!(out.rtf, Some(0.05));
     assert_eq!(out.confidence, Some(0.88));
 }
@@ -87,12 +93,15 @@ async fn tts_health_parses() {
     let url = stub_server(
         "200 OK",
         "application/json",
-        br#"{"ok":true,"model":"kokoro-82M","device":"cuda","loaded":true,"voice":"af_heart","sample_rate":24000,"error":null}"#.to_vec(),
+        br#"{"ok":true,"model":"kokoro-82M","device":"cuda","loaded":true,"warmed":true,"voice":"af_heart","sample_rate":24000,"last_elapsed_ms":88.1,"last_warmup_ms":321.0,"error":null,"warm_error":null}"#.to_vec(),
     );
     let health = TtsClient::new(url).health().await.unwrap();
     assert!(health.ok && health.loaded);
+    assert!(health.warmed);
     assert_eq!(health.model, "kokoro-82M");
     assert_eq!(health.sample_rate, Some(24000));
+    assert_eq!(health.last_elapsed_ms, Some(88.1));
+    assert_eq!(health.last_warmup_ms, Some(321.0));
 }
 
 #[tokio::test]
