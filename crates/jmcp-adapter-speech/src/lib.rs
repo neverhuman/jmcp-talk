@@ -1,11 +1,9 @@
-//! Thin HTTP clients for the JMCP speech sidecars.
+//! Thin HTTP clients for the JMCP speech daemon.
 //!
-//! The heavy CUDA/ML speech stack runs out-of-process in two Python sidecars
-//! (`services/speech/`): faster-whisper distil-small.en for realtime ASR and
-//! Kokoro-82M for TTS.
-//! This crate is the Rust side — exactly like [`jmcp_adapter_jekko`] shells out
-//! to a separate engine, these clients call the sidecars over localhost HTTP and
-//! never embed PyTorch/CUDA in the runtime.
+//! The default speech service is `jmcp-speechd`, a Rust HTTP daemon with
+//! deterministic offline ASR/TTS endpoints. This crate is the client side:
+//! runtime code calls the daemon over localhost HTTP and never embeds live model
+//! execution in the approval path.
 //!
 //! - [`AsrClient`] — `POST /transcribe` (raw audio bytes) → [`Transcription`].
 //! - [`TtsClient`] — `POST /synthesize` (text) → WAV bytes (24 kHz, PCM_16).
@@ -28,7 +26,7 @@ fn env_url(key: &str, default: &str) -> String {
     }
 }
 
-/// Health snapshot of the ASR sidecar (`GET /health`).
+/// Health snapshot of the ASR daemon (`GET /health`).
 #[derive(Clone, Debug, Deserialize)]
 pub struct AsrHealth {
     pub ok: bool,
@@ -80,14 +78,14 @@ pub struct Transcription {
     pub segments: Vec<TranscriptSegment>,
 }
 
-/// Client for the faster-whisper ASR sidecar.
+/// Client for the ASR daemon.
 pub struct AsrClient {
     http: reqwest::Client,
     base_url: String,
 }
 
-/// Shared HTTP client for the speech sidecars: bounded connect + request
-/// timeouts so a stalled sidecar surfaces a typed error instead of hanging.
+/// Shared HTTP client for the speech daemon: bounded connect + request timeouts
+/// so a stalled service surfaces a typed error instead of hanging.
 fn speech_http_client() -> reqwest::Client {
     reqwest::Client::builder()
         .connect_timeout(std::time::Duration::from_secs(5))
@@ -110,7 +108,7 @@ impl AsrClient {
         }
     }
 
-    /// Read the sidecar health (model, device, loaded).
+    /// Read the daemon health (model, device, loaded).
     pub async fn health(&self) -> Result<AsrHealth> {
         let url = format!("{}/health", self.base_url);
         let response = self
@@ -153,7 +151,7 @@ impl AsrClient {
     }
 }
 
-/// Health snapshot of the TTS sidecar (`GET /health`).
+/// Health snapshot of the TTS daemon (`GET /health`).
 #[derive(Clone, Debug, Deserialize)]
 pub struct TtsHealth {
     pub ok: bool,
@@ -177,7 +175,7 @@ pub struct TtsHealth {
     pub warm_error: Option<String>,
 }
 
-/// Client for the Kokoro TTS sidecar.
+/// Client for the TTS daemon.
 pub struct TtsClient {
     http: reqwest::Client,
     base_url: String,
@@ -197,7 +195,7 @@ impl TtsClient {
         }
     }
 
-    /// Read the sidecar health (model, device, voice, loaded).
+    /// Read the daemon health (model, device, voice, loaded).
     pub async fn health(&self) -> Result<TtsHealth> {
         let url = format!("{}/health", self.base_url);
         let response = self
@@ -214,7 +212,7 @@ impl TtsClient {
     }
 
     /// Synthesize `text` to WAV bytes (24 kHz, PCM_16). `voice`/`speed` are
-    /// optional overrides of the sidecar defaults.
+    /// optional overrides of the daemon defaults.
     pub async fn synthesize(
         &self,
         text: &str,
@@ -258,7 +256,7 @@ impl TtsClient {
     }
 }
 
-/// Audio container/codec the TTS sidecar emits.
+/// Audio container/codec the TTS daemon emits.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AudioFormat {
     /// WAV (24 kHz, PCM_16) — the default.

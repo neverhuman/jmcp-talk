@@ -9,7 +9,7 @@ fast-shell:
     source ops/ci/common.sh; log "fast-shell: checking shell syntax"; while IFS= read -r script; do bash -n "$script"; done < <(find scripts ops/ci -type f -name '*.sh' | sort)
 
 fast-json:
-    source ops/ci/common.sh; log "fast-json: validating JSON"; while IFS= read -r file; do python3 -m json.tool "$file" >/dev/null; done < <(find schemas contracts/events -type f -name '*.json' | sort); python3 -m json.tool package.json >/dev/null; python3 -m json.tool package-lock.json >/dev/null
+    source ops/ci/common.sh; log "fast-json: validating JSON"; cargo run -q -p jmcp-ci-tools -- validate-json $(find schemas contracts/events -type f -name '*.json' | sort) package.json package-lock.json apps/web/package.json apps/web/package-lock.json
 
 fast-rust:
     cargo fmt --all -- --check

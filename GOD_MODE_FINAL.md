@@ -145,8 +145,7 @@ Use the existing proof lanes for the slice you are claiming:
 Suggested verification by slice:
 
 - Documentation and routing slice:
-  - `python3 -m json.tool agent/owner-map.json`
-  - `python3 -m json.tool agent/test-map.json`
+  - `cargo run -q -p jmcp-ci-tools -- validate-json agent/owner-map.json agent/test-map.json`
   - `just score`
 - First broker implementation slice:
   - focused cargo tests for broker/API/app crates
