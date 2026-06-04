@@ -86,6 +86,16 @@ pub struct AsrClient {
     base_url: String,
 }
 
+/// Shared HTTP client for the speech sidecars: bounded connect + request
+/// timeouts so a stalled sidecar surfaces a typed error instead of hanging.
+fn speech_http_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(5))
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .expect("speech http client configuration is valid")
+}
+
 impl AsrClient {
     /// Build from `JMCP_ASR_URL` (default `http://127.0.0.1:18878`).
     pub fn from_env() -> Self {
@@ -95,7 +105,7 @@ impl AsrClient {
     /// Build against an explicit base URL.
     pub fn new(base_url: impl Into<String>) -> Self {
         Self {
-            http: reqwest::Client::new(),
+            http: speech_http_client(),
             base_url: base_url.into(),
         }
     }
@@ -182,7 +192,7 @@ impl TtsClient {
     /// Build against an explicit base URL.
     pub fn new(base_url: impl Into<String>) -> Self {
         Self {
-            http: reqwest::Client::new(),
+            http: speech_http_client(),
             base_url: base_url.into(),
         }
     }
