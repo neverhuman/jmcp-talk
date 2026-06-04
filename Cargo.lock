@@ -1211,6 +1211,7 @@ dependencies = [
  "jmcp-broker",
  "jmcp-domain",
  "jmcp-store",
+ "reqwest",
  "serde",
  "serde_json",
  "sha2",
