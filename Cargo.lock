@@ -1208,6 +1208,7 @@ dependencies = [
  "hex",
  "jcp-core",
  "jmcp-attention",
+ "jmcp-broker",
  "jmcp-domain",
  "jmcp-store",
  "serde",
