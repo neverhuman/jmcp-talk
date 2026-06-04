@@ -2,6 +2,7 @@
 members = [
     "crates/jcp-core",
     "crates/jmcp-domain",
+    "crates/jmcp-broker",
     "crates/jmcp-store",
     "crates/jmcp-attention",
     "crates/jmcp-app",

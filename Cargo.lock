@@ -1240,6 +1240,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "jmcp-broker"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "hex",
+ "jmcp-domain",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "jmcp-conformance"
 version = "0.1.0"
 dependencies = [
