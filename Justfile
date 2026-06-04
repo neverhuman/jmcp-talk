@@ -87,7 +87,10 @@ copy-code:
     jankurai copy-code . --json target/jankurai/copy-code.json --md target/jankurai/copy-code.md
 
 security-evidence:
-    jankurai security run --script ops/ci/security.sh --out target/jankurai/security/evidence.json
+    bash ops/ci/security.sh
+
+db-migration-analyze:
+    bash ops/ci/db-migration-analyze.sh
 
 language-bad-behavior:
     bash ops/ci/language-bad-behavior.sh
@@ -122,4 +125,4 @@ input-boundary:
 agent-tool-supply:
     jankurai audit . --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md
 
-check: fast build test security conformance contract-drift ux-qa cost-budget release-readiness score rust-map rust-witness rust-diagnose
+check: fast build test security conformance contract-drift db-migration-analyze ux-qa cost-budget release-readiness score rust-map rust-witness rust-diagnose
