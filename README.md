@@ -86,6 +86,8 @@ contracts, adapters, data truth, release gates, or generated artifacts:
   release gate coverage.
 - [Security](docs/security.md): secrets, approvals, replay safety, and supply
   chain evidence.
+- [Operations](docs/operations.md): startup, shutdown, degraded operation, and
+  operational evidence.
 - [Release gate](docs/release.md) and
   [release process doc](docs/release-process.md): version source, changelog,
   proof artifacts, integrity/provenance evidence, and rollback.

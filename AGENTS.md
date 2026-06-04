@@ -30,9 +30,10 @@ Before Jankurai, release, contract, data, or generated-artifact work, route thro
 8. `docs/generated-zones.md`
 9. `docs/testing.md`
 10. `docs/security.md`
-11. `docs/release.md`
-12. `docs/release-process.md`
-13. `docs/audit-rubric.md`
+11. `docs/operations.md`
+12. `docs/release.md`
+13. `docs/release-process.md`
+14. `docs/audit-rubric.md`
 
 ## Jankurai
 
