@@ -6,6 +6,17 @@ runtime: Rust authority API, SQLite event store, CLI, Rust TUI, React cockpit,
 Telegram intake/approvals, and local adapter boundaries for Jankurai, Jeryu,
 Jailgun, and Jekko.
 
+Read [AGENTS.md](./AGENTS.md) before making changes.
+
+## Quick Start
+
+Bring up the local backend and cockpit with the default safe ports:
+
+```bash
+cargo run -p jmcpd -- --database jmcp.db --listen 127.0.0.1:18877
+VITE_JMCP_API_URL=http://127.0.0.1:18877 npm --workspace @jmcp/cockpit run dev -- --host 127.0.0.1 --port 15873
+```
+
 ## Operator Surfaces
 
 ### Web Cockpit

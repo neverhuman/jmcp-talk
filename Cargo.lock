@@ -1187,6 +1187,7 @@ dependencies = [
  "jmcp-domain",
  "jmcp-now",
  "jmcp-store",
+ "reqwest",
  "serde",
  "serde_json",
  "tokio",
