@@ -1208,6 +1208,7 @@ dependencies = [
  "chrono",
  "hex",
  "jcp-core",
+ "jmcp-adapter-jekko",
  "jmcp-attention",
  "jmcp-broker",
  "jmcp-domain",
