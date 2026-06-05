@@ -297,5 +297,212 @@ impl AudioFormat {
     }
 }
 
+/// Speech runtime adapter family.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SpeechAdapterKind {
+    /// MiniCPM-o 4.5 speech-to-speech spike. Live use is opt-in.
+    MinicpmO45,
+    /// Existing ASR/TTS sidecar cascade.
+    LegacyCascade,
+    /// Fully deterministic local fixture adapter.
+    Deterministic,
+}
+
+impl SpeechAdapterKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SpeechAdapterKind::MinicpmO45 => "minicpm-o45",
+            SpeechAdapterKind::LegacyCascade => "legacy-cascade",
+            SpeechAdapterKind::Deterministic => "deterministic",
+        }
+    }
+
+    pub fn parse(value: &str) -> Result<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "minicpm-o45" | "minicpm_o45" | "minicpm" => Ok(Self::MinicpmO45),
+            "legacy-cascade" | "legacy_cascade" | "legacy" => Ok(Self::LegacyCascade),
+            "deterministic" | "fixture" | "offline" => Ok(Self::Deterministic),
+            other => anyhow::bail!("unsupported speech adapter {other:?}"),
+        }
+    }
+}
+
+/// Runtime configuration for speech turn execution.
+#[derive(Clone, Debug)]
+pub struct SpeechRuntimeConfig {
+    pub adapter: SpeechAdapterKind,
+    pub asr_url: String,
+    pub tts_url: String,
+    pub minicpm_o45_url: Option<String>,
+    pub minicpm_o45_quantization: String,
+    pub minicpm_o45_device: String,
+    pub deterministic_transcript: String,
+    pub minicpm_fixture_transcript: Option<String>,
+}
+
+impl SpeechRuntimeConfig {
+    pub fn from_env() -> Result<Self> {
+        let adapter = match std::env::var("JMCP_SPEECH_ADAPTER") {
+            Ok(value) if !value.trim().is_empty() => SpeechAdapterKind::parse(&value)?,
+            _ => SpeechAdapterKind::LegacyCascade,
+        };
+        Ok(Self {
+            adapter,
+            asr_url: env_url("JMCP_ASR_URL", DEFAULT_ASR_URL),
+            tts_url: env_url("JMCP_TTS_URL", DEFAULT_TTS_URL),
+            minicpm_o45_url: std::env::var("MINICPM_O45_URL")
+                .ok()
+                .filter(|value| !value.trim().is_empty()),
+            minicpm_o45_quantization: std::env::var("MINICPM_O45_QUANTIZATION")
+                .unwrap_or_else(|_| "int4".to_owned()),
+            minicpm_o45_device: std::env::var("MINICPM_O45_DEVICE")
+                .unwrap_or_else(|_| "cuda:0".to_owned()),
+            deterministic_transcript: std::env::var("JMCP_DETERMINISTIC_TRANSCRIPT")
+                .unwrap_or_else(|_| "deterministic speech turn".to_owned()),
+            minicpm_fixture_transcript: std::env::var("MINICPM_O45_FIXTURE_TRANSCRIPT")
+                .ok()
+                .filter(|value| !value.trim().is_empty()),
+        })
+    }
+}
+
+/// Non-secret runtime health/configuration summary.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SpeechRuntimeHealth {
+    pub adapter: SpeechAdapterKind,
+    pub model: &'static str,
+    pub quantization: Option<String>,
+    pub device: Option<String>,
+    pub live_model_configured: bool,
+    pub fallback: Option<SpeechAdapterKind>,
+}
+
+/// Turn-level speech runtime. Core remains responsible for ledgers, approvals,
+/// tool policy, and durable side effects.
+pub struct SpeechRuntime {
+    config: SpeechRuntimeConfig,
+    asr: AsrClient,
+    tts: TtsClient,
+}
+
+impl SpeechRuntime {
+    pub fn from_env() -> Result<Self> {
+        Self::new(SpeechRuntimeConfig::from_env()?)
+    }
+
+    pub fn new(config: SpeechRuntimeConfig) -> Result<Self> {
+        Ok(Self {
+            asr: AsrClient::new(config.asr_url.clone()),
+            tts: TtsClient::new(config.tts_url.clone()),
+            config,
+        })
+    }
+
+    pub fn deterministic(transcript: impl Into<String>) -> Self {
+        Self::new(SpeechRuntimeConfig {
+            adapter: SpeechAdapterKind::Deterministic,
+            asr_url: DEFAULT_ASR_URL.to_owned(),
+            tts_url: DEFAULT_TTS_URL.to_owned(),
+            minicpm_o45_url: None,
+            minicpm_o45_quantization: "int4".to_owned(),
+            minicpm_o45_device: "offline".to_owned(),
+            deterministic_transcript: transcript.into(),
+            minicpm_fixture_transcript: None,
+        })
+        .expect("deterministic speech runtime config is valid")
+    }
+
+    pub fn adapter(&self) -> SpeechAdapterKind {
+        self.config.adapter
+    }
+
+    pub fn health_summary(&self) -> SpeechRuntimeHealth {
+        match self.config.adapter {
+            SpeechAdapterKind::MinicpmO45 => SpeechRuntimeHealth {
+                adapter: SpeechAdapterKind::MinicpmO45,
+                model: "MiniCPM-o-4.5",
+                quantization: Some(self.config.minicpm_o45_quantization.clone()),
+                device: Some(self.config.minicpm_o45_device.clone()),
+                live_model_configured: self.config.minicpm_o45_url.is_some(),
+                fallback: Some(SpeechAdapterKind::LegacyCascade),
+            },
+            SpeechAdapterKind::LegacyCascade => SpeechRuntimeHealth {
+                adapter: SpeechAdapterKind::LegacyCascade,
+                model: "legacy-asr-tts-cascade",
+                quantization: None,
+                device: None,
+                live_model_configured: true,
+                fallback: None,
+            },
+            SpeechAdapterKind::Deterministic => SpeechRuntimeHealth {
+                adapter: SpeechAdapterKind::Deterministic,
+                model: "jmcp-deterministic-speech",
+                quantization: None,
+                device: Some("offline".to_owned()),
+                live_model_configured: true,
+                fallback: None,
+            },
+        }
+    }
+
+    pub async fn transcribe_turn(
+        &self,
+        audio: Vec<u8>,
+        language: Option<&str>,
+    ) -> Result<Transcription> {
+        match self.config.adapter {
+            SpeechAdapterKind::Deterministic => Ok(deterministic_transcription(
+                &self.config.deterministic_transcript,
+                language,
+            )),
+            SpeechAdapterKind::LegacyCascade => self.asr.transcribe(audio, language).await,
+            SpeechAdapterKind::MinicpmO45 => {
+                if let Some(transcript) = &self.config.minicpm_fixture_transcript {
+                    return Ok(deterministic_transcription(transcript, language));
+                }
+                self.asr.transcribe(audio, language).await.context(
+                    "MiniCPM-o 4.5 live adapter is not configured; legacy cascade fallback failed",
+                )
+            }
+        }
+    }
+
+    pub async fn synthesize_reply(&self, text: &str, format: AudioFormat) -> Result<Vec<u8>> {
+        match self.config.adapter {
+            SpeechAdapterKind::Deterministic => Ok(deterministic_audio(format)),
+            SpeechAdapterKind::LegacyCascade | SpeechAdapterKind::MinicpmO45 => {
+                self.tts.synthesize_as(text, None, None, format).await
+            }
+        }
+    }
+}
+
+fn deterministic_transcription(text: &str, language: Option<&str>) -> Transcription {
+    Transcription {
+        text: text.to_owned(),
+        language: language.unwrap_or("en").to_owned(),
+        language_probability: 1.0,
+        confidence: if text.trim().is_empty() {
+            None
+        } else {
+            Some(1.0)
+        },
+        duration: 0.0,
+        elapsed_ms: Some(0.0),
+        rtf: Some(0.0),
+        segments: Vec::new(),
+    }
+}
+
+fn deterministic_audio(format: AudioFormat) -> Vec<u8> {
+    match format {
+        AudioFormat::Wav => b"RIFF\x24\x00\x00\x00WAVEfmt jmcp-deterministic".to_vec(),
+        AudioFormat::OggOpus => b"OggS\0\x02jmcp-deterministic".to_vec(),
+    }
+}
+
+#[cfg(test)]
+mod runtime_tests;
+
 #[cfg(test)]
 mod speech_tests;
