@@ -1198,6 +1198,7 @@ dependencies = [
  "jmcp-agent-bus",
  "jmcp-app",
  "jmcp-domain",
+ "jmcp-intel",
  "jmcp-now",
  "jmcp-store",
  "reqwest",
