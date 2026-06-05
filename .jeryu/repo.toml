@@ -1,0 +1,7 @@
+schema_version = 1
+repo = "jmcp-talk"
+profile = "rust-workspace"
+default_branch = "main"
+ci_command = "just ci"
+gpu_lane = "workflow_dispatch:self-hosted-rtx3090"
+

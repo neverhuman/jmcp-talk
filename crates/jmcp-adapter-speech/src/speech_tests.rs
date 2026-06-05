@@ -1,8 +1,11 @@
 use std::io::{Read, Write};
 use std::net::TcpListener;
+use std::sync::Mutex;
 use std::thread;
 
 use super::{AsrClient, TtsClient};
+
+static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 /// Spin a one-shot stub HTTP server that answers the next request with a fixed
 /// response, and return its base URL. Mirrors the jailgun adapter's test stubs.
@@ -162,4 +165,48 @@ async fn tts_synthesize_as_ogg_requests_ogg_and_returns_bytes() {
         request_line.contains("format=ogg"),
         "client must request ?format=ogg, got: {request_line}"
     );
+}
+
+#[tokio::test]
+async fn talk_env_takes_precedence_over_legacy_asr_alias() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let primary = stub_server(
+        "200 OK",
+        "application/json",
+        br#"{"ok":true,"model":"primary","device":"cpu","loaded":true}"#.to_vec(),
+    );
+    let legacy = stub_server(
+        "200 OK",
+        "application/json",
+        br#"{"ok":true,"model":"legacy","device":"cpu","loaded":true}"#.to_vec(),
+    );
+    std::env::set_var("JMCP_TALK_ASR_URL", &primary);
+    std::env::set_var("JMCP_ASR_URL", &legacy);
+
+    let client = AsrClient::from_env();
+    std::env::remove_var("JMCP_TALK_ASR_URL");
+    std::env::remove_var("JMCP_ASR_URL");
+    drop(_guard);
+
+    let health = client.health().await.unwrap();
+    assert_eq!(health.model, "primary");
+}
+
+#[tokio::test]
+async fn legacy_tts_alias_still_works_when_talk_env_absent() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let legacy = stub_server(
+        "200 OK",
+        "application/json",
+        br#"{"ok":true,"model":"legacy-tts","device":"cpu","loaded":true}"#.to_vec(),
+    );
+    std::env::remove_var("JMCP_TALK_TTS_URL");
+    std::env::set_var("JMCP_TTS_URL", &legacy);
+
+    let client = TtsClient::from_env();
+    std::env::remove_var("JMCP_TTS_URL");
+    drop(_guard);
+
+    let health = client.health().await.unwrap();
+    assert_eq!(health.model, "legacy-tts");
 }

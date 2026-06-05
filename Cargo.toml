@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "apps/jmcp-speechd",
     "crates/jmcp-adapter-speech",
 ]
 resolver = "2"

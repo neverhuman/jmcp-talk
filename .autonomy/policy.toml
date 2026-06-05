@@ -1,0 +1,7 @@
+schema_version = 1
+repo = "jmcp-talk"
+mode = "pr_only"
+mutating_effects_require_approval = true
+gpu_live_default = false
+raw_audio_capture_default = false
+

@@ -3,27 +3,22 @@ set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 default:
     @just --list
 
-fast: fast-shell fast-json fast-rust fast-npm fast-actions
+fast: fast-shell fast-rust fast-python fast-actions
 
 fast-shell:
-    source ops/ci/common.sh; log "fast-shell: checking shell syntax"; while IFS= read -r script; do bash -n "$script"; done < <(find scripts ops/ci -type f -name '*.sh' | sort)
-
-fast-json:
-    source ops/ci/common.sh; log "fast-json: validating JSON"; while IFS= read -r file; do python3 -m json.tool "$file" >/dev/null; done < <(find schemas contracts/events -type f -name '*.json' | sort); python3 -m json.tool package.json >/dev/null; python3 -m json.tool package-lock.json >/dev/null
+    while IFS= read -r script; do bash -n "$script"; done < <(find scripts services ops/ci -type f -name '*.sh' | sort)
 
 fast-rust:
     cargo fmt --all -- --check
     cargo check --workspace --all-targets --locked
 
-fast-npm:
-    npm ci --ignore-scripts --no-audit --no-fund
-    npm --workspace @jankurai/ux-qa run build
-    npm --workspace @jankurai/ux-qa run test
+fast-python:
+    while IFS= read -r file; do python3 -m py_compile "$file"; done < <(find services -type f -name '*.py' | sort)
 
 fast-actions:
-    source ops/ci/common.sh; if has actionlint; then actionlint; else missing_tool actionlint "GitHub Actions linting"; fi
+    if command -v actionlint >/dev/null 2>&1; then actionlint; else echo "[jmcp-talk][warn] skipping actionlint: not installed" >&2; fi
 
-ci: fast test-rust test-cockpit test-web conformance contract-drift
+ci: fast test contract-drift
 
 security: security-evidence
 
@@ -33,41 +28,18 @@ conformance:
 jankurai-local:
     ./ops/ci/jankurai-local.sh
 
-build: build-rust build-cockpit build-web
+build: build-rust
 
 build-rust:
     cargo build --workspace --locked
 
-build-cockpit:
-    npm --workspace @jmcp/cockpit run build
-
-build-web:
-    npm --prefix apps/web run build
-
-test: test-rust test-cockpit test-web
+test: test-rust
 
 test-rust:
     cargo test --workspace --all-targets --locked
 
-test-cockpit:
-    npm --workspace @jmcp/cockpit run test
-
-test-web:
-    npm --prefix apps/web run test:ux
-
-ux-qa: ux-qa-playwright ux-qa-audit
-
-ux-qa-playwright:
-    npm --prefix apps/web run test:ux
-
-ux-qa-audit:
-    jankurai ux audit --config agent/ux-qa.toml --out target/jankurai/ux-qa.json
-
-ux-qa-package-build:
-    npm --workspace @jankurai/ux-qa run build
-
-ux-qa-package-test:
-    npm --workspace @jankurai/ux-qa run test
+contract-drift:
+    python3 ops/ci/contract_drift.py
 
 score: score-advisory
 
@@ -101,8 +73,8 @@ rust-witness:
 rust-diagnose:
     jankurai rust diagnose .
 
-contract-drift:
-    bash ops/ci/contract-drift.sh
+gpu-live:
+    bash ops/ci/minicpm-live.sh
 
 cost-budget:
     bash ops/ci/cost-budget.sh
@@ -119,4 +91,4 @@ input-boundary:
 agent-tool-supply:
     jankurai audit . --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md
 
-check: fast build test security conformance contract-drift ux-qa cost-budget release-readiness score rust-map rust-witness rust-diagnose
+check: fast build test contract-drift

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "workspace": "jmcp-talk",
+  "tests": {
+    ".github/workflows/": {
+      "command": "just fast",
+      "purpose": "verify public CI remains deterministic and GPU live stays dispatch-only"
+    },
+    ".jeryu/": {
+      "command": "just fast",
+      "purpose": "verify Jeryu metadata remains parseable"
+    },
+    ".autonomy/": {
+      "command": "just fast",
+      "purpose": "verify autonomy metadata keeps raw audio and GPU live off by default"
+    },
+    "apps/jmcp-speechd/": {
+      "command": "cargo test -p jmcp-speechd --locked",
+      "purpose": "verify deterministic speech daemon health, metrics, and trace behavior"
+    },
+    "contracts/speech/": {
+      "command": "just contract-drift",
+      "purpose": "verify speech OpenAPI contract routes and markers"
+    },
+    "crates/jmcp-adapter-speech/": {
+      "command": "cargo test -p jmcp-adapter-speech --locked",
+      "purpose": "verify speech adapter env precedence and HTTP parsing"
+    },
+    "services/speech/": {
+      "command": "just fast",
+      "purpose": "verify speech sidecar scripts and Python syntax"
+    }
+  }
+}
+

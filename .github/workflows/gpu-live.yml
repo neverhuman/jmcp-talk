@@ -1,0 +1,20 @@
+name: gpu-live
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  minicpm-o45:
+    runs-on: [self-hosted, linux, x64, rtx3090]
+    env:
+      JMCP_TALK_ADAPTER: minicpm-o45
+      JMCP_TALK_MINICPM_O45_DEVICE: cuda:0
+      JMCP_TALK_MINICPM_O45_QUANTIZATION: int4
+    steps:
+      - uses: actions/checkout@v4
+      - name: MiniCPM live lane
+        run: bash ops/ci/minicpm-live.sh
+

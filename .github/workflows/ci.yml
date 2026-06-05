@@ -1,0 +1,30 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  talk:
+    runs-on: ubuntu-latest
+    env:
+      JMCP_STRICT_TOOLS: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Shell syntax
+        run: while IFS= read -r script; do bash -n "$script"; done < <(find scripts services ops/ci -type f -name '*.sh' | sort)
+      - name: Python syntax
+        run: while IFS= read -r file; do python3 -m py_compile "$file"; done < <(find services -type f -name '*.py' | sort)
+      - name: Rust check
+        run: cargo check --workspace --all-targets --locked
+      - name: Rust tests
+        run: cargo test --workspace --all-targets --locked
+      - name: Speech contract
+        run: python3 ops/ci/contract_drift.py

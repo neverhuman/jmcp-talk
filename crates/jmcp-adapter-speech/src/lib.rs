@@ -11,7 +11,8 @@
 //! - [`TtsClient`] — `POST /synthesize` (text) → WAV bytes (24 kHz, PCM_16).
 //!
 //! Both default to JMCP-safe localhost ports and are overridable via
-//! `JMCP_ASR_URL` / `JMCP_TTS_URL`.
+//! `JMCP_TALK_ASR_URL` / `JMCP_TALK_TTS_URL`. Legacy `JMCP_ASR_URL` and
+//! `JMCP_TTS_URL` aliases remain compatibility fallbacks only.
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -19,12 +20,14 @@ use serde::Deserialize;
 const DEFAULT_ASR_URL: &str = "http://127.0.0.1:18878";
 const DEFAULT_TTS_URL: &str = "http://127.0.0.1:18901";
 
-fn env_url(key: &str, default: &str) -> String {
-    match std::env::var(key) {
+fn env_url(primary: &str, legacy: &str, default: &str) -> String {
+    match std::env::var(primary) {
         Ok(value) if !value.trim().is_empty() => value,
-        Ok(_) => default.to_owned(),
-        Err(std::env::VarError::NotPresent) => default.to_owned(),
-        Err(std::env::VarError::NotUnicode(_)) => default.to_owned(),
+        Ok(_) | Err(std::env::VarError::NotUnicode(_)) => default.to_owned(),
+        Err(std::env::VarError::NotPresent) => match std::env::var(legacy) {
+            Ok(value) if !value.trim().is_empty() => value,
+            _ => default.to_owned(),
+        },
     }
 }
 
@@ -87,9 +90,14 @@ pub struct AsrClient {
 }
 
 impl AsrClient {
-    /// Build from `JMCP_ASR_URL` (default `http://127.0.0.1:18878`).
+    /// Build from `JMCP_TALK_ASR_URL`, falling back to legacy `JMCP_ASR_URL`
+    /// and then `http://127.0.0.1:18878`.
     pub fn from_env() -> Self {
-        Self::new(env_url("JMCP_ASR_URL", DEFAULT_ASR_URL))
+        Self::new(env_url(
+            "JMCP_TALK_ASR_URL",
+            "JMCP_ASR_URL",
+            DEFAULT_ASR_URL,
+        ))
     }
 
     /// Build against an explicit base URL.
@@ -174,9 +182,14 @@ pub struct TtsClient {
 }
 
 impl TtsClient {
-    /// Build from `JMCP_TTS_URL` (default `http://127.0.0.1:18901`).
+    /// Build from `JMCP_TALK_TTS_URL`, falling back to legacy `JMCP_TTS_URL`
+    /// and then `http://127.0.0.1:18901`.
     pub fn from_env() -> Self {
-        Self::new(env_url("JMCP_TTS_URL", DEFAULT_TTS_URL))
+        Self::new(env_url(
+            "JMCP_TALK_TTS_URL",
+            "JMCP_TTS_URL",
+            DEFAULT_TTS_URL,
+        ))
     }
 
     /// Build against an explicit base URL.
