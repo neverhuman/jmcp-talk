@@ -4,6 +4,9 @@
 !.env.example
 telegram.env
 jmcp.telegram.offset
+# local runtime sqlite databases (never tracked)
+jmcp.db
+*.db
 node_modules/
 target/
 dist/
