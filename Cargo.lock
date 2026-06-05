@@ -1322,6 +1322,7 @@ dependencies = [
  "jmcp-store",
  "serde",
  "serde_json",
+ "tokio",
  "uuid",
 ]
 
@@ -1413,6 +1414,7 @@ dependencies = [
  "jmcp-app",
  "jmcp-approval-telegram",
  "jmcp-domain",
+ "jmcp-intel",
  "jmcp-store",
  "serde_json",
  "tokio",
