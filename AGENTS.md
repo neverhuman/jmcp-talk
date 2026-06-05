@@ -1,4 +1,4 @@
-# JMCP Agent Instructions
+# JMCP Talk Agent Instructions
 
 This repository follows the runtime toolchain instructions at:
 
@@ -6,34 +6,20 @@ This repository follows the runtime toolchain instructions at:
 
 ## Scope
 
-JMCP is the system. JCP/1.0.0 is the protocol. JPCM is the backbone and transport profile. V1 targets a local production-shaped core with embedded SQLite, an in-process replayable event bus by default, a Rust backend, a React dashboard, a Rust TUI, Telegram text intake and approvals, local Jankurai/Jeryu/Jekko adapters, CI-local parity, and strong tests.
+`jmcp-talk` owns speech runtime adapters, MiniCPM-o 4.5 spike work, legacy
+voice fallback, deterministic speech fixtures, and local speech sidecars. Core
+authority remains in `jmcp-core`; talk code must route mutations, approvals,
+ledger records, and tool policy through core APIs.
 
 ## Agent Rules
 
 - Use the `rtk` prefix for shell commands.
 - Treat `AGENT_CHAT.md` as append-only.
-- Keep work scoped to the paths explicitly owned for the task.
-- Do not edit Rust crates, apps, package files, scripts, CI, schemas, or `tips/` unless a later instruction grants ownership.
+- Keep work scoped to speech services, speech adapter crates, speech daemon
+  apps, and voice runtime docs.
+- Default tests must be deterministic and local. MiniCPM-o live GPU runs are an
+  opt-in spike lane, not the default proof path.
 - Preserve other agents' edits. If a file has changed unexpectedly, inspect and merge rather than overwrite.
-
-## Agent-Readable Docs
-
-Before Jankurai, release, contract, data, or generated-artifact work, route through:
-
-1. `agent/owner-map.json`
-2. `agent/test-map.json`
-3. `agent/boundaries.toml`
-4. `agent/generated-zones.toml`
-5. `agent/proof-lanes.toml`
-6. `docs/architecture.md`
-7. `docs/boundaries.md`
-8. `docs/generated-zones.md`
-9. `docs/testing.md`
-10. `docs/security.md`
-11. `docs/operations.md`
-12. `docs/release.md`
-13. `docs/release-process.md`
-14. `docs/audit-rubric.md`
 
 ## Jankurai
 
