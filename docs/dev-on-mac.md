@@ -36,9 +36,11 @@ rev** and report a false regression — see `ops/ci/jankurai-ratchet.sh` and pas
 `JANKURAI_BIN=<pinned>` to match CI exactly (the pinned rev is in
 `.github/workflows/jankurai.yml`).
 
-## 4. Speech Daemon on the Mac
+## 4. Speech Sidecars on the Mac
 
-The launchers run the Rust `jmcp-speechd` daemon on the existing ASR/TTS ports:
+The interactive launchers run the real ASR/TTS sidecars on the existing ports.
+On a Mac, ASR defaults to CPU/int8 because faster-whisper/CTranslate2 does not
+use Metal:
 
 ```bash
 ./services/speech/run-asr.sh
@@ -46,8 +48,10 @@ The launchers run the Rust `jmcp-speechd` daemon on the existing ASR/TTS ports:
 ```
 
 - Ports are unchanged and JMCP-safe: ASR `127.0.0.1:18878`, TTS `127.0.0.1:18901`.
-- Set `JMCP_SPEECHD_TRANSCRIPT` to control deterministic ASR text.
 - Smoke check once both are up: `./services/speech/selftest.sh`.
+- For deterministic contract tests, use `./services/speech/run-asr-deterministic.sh`
+  and `./services/speech/run-tts-deterministic.sh`; set `JMCP_SPEECHD_TRANSCRIPT`
+  to control deterministic ASR text.
 
 ## 5. Voice approvals (optional)
 

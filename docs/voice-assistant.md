@@ -1,9 +1,9 @@
 # JMCP Local Voice Assistant
 
 The cockpit voice assistant stays local: the browser captures microphone audio,
-`jmcp-speechd` serves deterministic ASR/TTS endpoints, and an optional local
-OpenAI-compatible reasoning endpoint can answer spoken commands. Audio and text
-do not need to leave the machine for the default offline path.
+the realtime ASR/TTS sidecars serve speech endpoints, and a local
+OpenAI-compatible reasoning endpoint answers spoken commands. Audio and text do
+not need to leave the machine for the interactive path.
 
 ## Architecture
 
@@ -20,12 +20,11 @@ browser mic
   energy VAD decides where each utterance starts and ends.
 - The cockpit reaches local services through the Vite dev proxy (`/asr`, `/tts`,
   `/llm`) so browser requests remain same-origin.
-- `jmcp-speechd` is deterministic by default. It is suitable for local contract
-  tests and fail-closed wiring. Live model-backed speech providers must be added
-  behind the same HTTP contract and separately governed.
-- The reasoning endpoint is not shipped by this repository. Point
-  `VITE_LLM_TARGET` at a local OpenAI-compatible service when interactive
-  reasoning is desired.
+- `run-asr.sh` starts faster-whisper and `run-tts.sh` starts Kokoro. The
+  explicit `run-asr-deterministic.sh` and `run-tts-deterministic.sh` launchers
+  keep `jmcp-speechd` available for offline contract tests.
+- `services/llm/realtime-voice.sh` starts ASR, TTS, and the local vLLM profile
+  used by Cockpit voice.
 
 ## Bring-Up
 
@@ -42,9 +41,9 @@ recognized text and any spoken reply as text beside the audio state.
 
 | Service | Bind | Notes |
 | --- | ---: | --- |
-| ASR (`jmcp-speechd`) | `127.0.0.1:18878` | `GET /health`, `POST /transcribe` |
-| TTS (`jmcp-speechd`) | `127.0.0.1:18901` | `GET /health`, `POST /synthesize?format=wav\|ogg` |
-| Reasoning LLM | `127.0.0.1:18902` | Optional OpenAI-compatible `/v1` API |
+| ASR (faster-whisper) | `127.0.0.1:18878` | `GET /health`, `POST /transcribe` |
+| TTS (Kokoro) | `127.0.0.1:18901` | `GET /health`, `POST /synthesize?format=wav\|ogg` |
+| Reasoning LLM | `127.0.0.1:18902` | OpenAI-compatible `/v1` API |
 | Cockpit (Vite dev) | `127.0.0.1:15873` | proxies `/asr`, `/tts`, `/llm` |
 
 All four are JMCP-safe ports. None of them is a Jeryu-protected port (`2224`,
@@ -53,14 +52,18 @@ on those ports.
 
 ## Configuration
 
-Speech daemon:
+Speech sidecars:
 
 | Env | Meaning |
 | --- | --- |
 | `ASR_BIND` | ASR launcher bind address, default `127.0.0.1:18878` |
 | `TTS_BIND` | TTS launcher bind address, default `127.0.0.1:18901` |
-| `JMCP_SPEECHD_TRANSCRIPT` | deterministic text returned by `/transcribe` |
-| `JMCP_SPEECHD_FAIL_CLOSED` | set `true` to make speech endpoints fail closed |
+| `ASR_MODEL` | faster-whisper model, default `distil-small.en` |
+| `ASR_DEVICE` / `ASR_COMPUTE` | ASR device and compute type |
+| `TTS_DEVICE` / `TTS_VOICE` | TTS device and voice |
+
+Deterministic `jmcp-speechd` launchers also accept `JMCP_SPEECHD_TRANSCRIPT`
+and `JMCP_SPEECHD_FAIL_CLOSED`.
 
 Cockpit proxy targets:
 

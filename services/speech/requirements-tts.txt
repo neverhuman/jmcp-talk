@@ -1,0 +1,5 @@
+# JMCP TTS sidecar: Kokoro-82M (Apache-2.0, weights + code).
+# The launcher creates the venv with --system-site-packages so system torch is
+# reused instead of duplicated.
+kokoro==0.9.4
+soundfile==0.13.1

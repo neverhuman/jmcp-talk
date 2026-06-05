@@ -1,0 +1,3 @@
+# JMCP ASR sidecar: faster-whisper over CTranslate2. PyAV bundles ffmpeg for
+# decoding, so no system ffmpeg is required.
+faster-whisper==1.2.1

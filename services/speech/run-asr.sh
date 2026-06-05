@@ -1,11 +1,33 @@
 #!/usr/bin/env bash
-# Launch the Rust JMCP speech daemon in ASR mode on the existing ASR port.
+# Launch the real JMCP ASR sidecar on the local GPU/CPU.
 set -Eeuo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV="$HERE/.venv"
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-cd "$ROOT"
+if [[ ! -x "$VENV/bin/python" ]]; then
+  echo "[asr] creating venv + installing deps (one-time)..." >&2
+  python3 -m venv "$VENV"
+  "$VENV/bin/pip" install --quiet --upgrade pip
+  "$VENV/bin/pip" install --quiet -r "$HERE/requirements-asr.txt"
+fi
 
-export JMCP_SPEECHD_BIND="${ASR_BIND:-127.0.0.1:18878}"
-export JMCP_SPEECHD_ROLE="asr"
-export JMCP_SPEECHD_TRANSCRIPT="${JMCP_SPEECHD_TRANSCRIPT:-}"
-exec cargo run --quiet -p jmcp-speechd -- --bind "$JMCP_SPEECHD_BIND" --role "$JMCP_SPEECHD_ROLE"
+if [[ -z "${ASR_DEVICE:-}" ]]; then
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    ASR_DEVICE=cuda
+  else
+    ASR_DEVICE=cpu
+  fi
+fi
+if [[ -z "${ASR_COMPUTE:-}" ]]; then
+  if [[ "$ASR_DEVICE" == "cpu" ]]; then
+    ASR_COMPUTE=int8
+  else
+    ASR_COMPUTE=float16
+  fi
+fi
+export ASR_MODEL="${ASR_MODEL:-distil-small.en}"
+export ASR_DEVICE
+export ASR_COMPUTE
+export ASR_BEAM_SIZE="${ASR_BEAM_SIZE:-1}"
+export ASR_BIND="${ASR_BIND:-127.0.0.1:18878}"
+exec "$VENV/bin/python" "$HERE/asr_sidecar.py"

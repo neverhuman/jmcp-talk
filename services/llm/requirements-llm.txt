@@ -1,0 +1,4 @@
+# JMCP local reasoning-model sidecar: vLLM serves an OpenAI-compatible /v1 API.
+# Install with the cu126 wheel index from run-llm.sh.
+vllm==0.9.2
+transformers==4.53.3

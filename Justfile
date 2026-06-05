@@ -55,6 +55,9 @@ test-cockpit:
 test-web:
     npm --prefix apps/web run test:ux
 
+voice-live:
+    bash ops/ci/voice-live.sh
+
 ux-qa: ux-qa-playwright ux-qa-audit
 
 ux-qa-playwright:

@@ -1,9 +1,13 @@
-# JMCP Speech Daemon
+# JMCP Speech Sidecars
 
-JMCP voice approvals and the cockpit voice assistant use a local Rust HTTP
-daemon, `jmcp-speechd`. It preserves the existing speech endpoints while keeping
-the default provider deterministic, offline, and fail-closed instead of binding
-the repository to a live model stack.
+Interactive voice uses real local speech services by default:
+
+- ASR: `asr_sidecar.py` with faster-whisper/CTranslate2.
+- TTS: `tts_sidecar.py` with Kokoro-82M.
+
+The deterministic Rust `jmcp-speechd` remains available for offline
+unit/contract tests through explicit `*-deterministic.sh` launchers. It should
+not silently replace the interactive speech stack.
 
 | Role | Default port | API |
 | --- | ---: | --- |
@@ -20,15 +24,28 @@ the repository to a live model stack.
 Config via env:
 
 - `ASR_BIND` / `TTS_BIND`: bind addresses for the two launcher scripts.
-- `JMCP_SPEECHD_TRANSCRIPT`: deterministic ASR text returned by `/transcribe`.
-- `JMCP_SPEECHD_FAIL_CLOSED=true`: make health and speech requests fail closed.
+- `ASR_MODEL`: default `distil-small.en`.
+- `ASR_DEVICE` / `ASR_COMPUTE` / `ASR_BEAM_SIZE`.
+- `TTS_VOICE` / `TTS_LANG` / `TTS_DEVICE`.
 
-## Deterministic Behavior
+## Deterministic Test Launchers
 
-The default daemon does not perform live speech recognition or live speech
-synthesis. `/transcribe` returns `JMCP_SPEECHD_TRANSCRIPT` and timing metadata.
-`/synthesize` returns small deterministic WAV or OGG-like bytes suitable for
-client contract tests and local fail-closed wiring.
+```bash
+./services/speech/run-asr-deterministic.sh
+./services/speech/run-tts-deterministic.sh
+```
+
+These run `cargo run -p jmcp-speechd` on the same endpoint shape. Configure
+with `JMCP_SPEECHD_TRANSCRIPT` and `JMCP_SPEECHD_FAIL_CLOSED=true`.
+
+## Verify
+
+```bash
+./services/speech/selftest.sh
+```
+
+The selftest synthesizes a WAV with TTS, transcribes it with ASR, normalizes both
+strings, and fails unless ASR hears the generated phrase.
 
 ## Integration
 
