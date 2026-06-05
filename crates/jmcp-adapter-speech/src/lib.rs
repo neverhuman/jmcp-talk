@@ -26,6 +26,22 @@ fn env_url(key: &str, default: &str) -> String {
     }
 }
 
+fn first_env(keys: &[&str], default: &str) -> String {
+    for key in keys {
+        match std::env::var(key) {
+            Ok(value) if !value.trim().is_empty() => return value,
+            _ => {}
+        }
+    }
+    default.to_owned()
+}
+
+fn optional_first_env(keys: &[&str]) -> Option<String> {
+    keys.iter()
+        .filter_map(|key| std::env::var(key).ok())
+        .find(|value| !value.trim().is_empty())
+}
+
 /// Health snapshot of the ASR daemon (`GET /health`).
 #[derive(Clone, Debug, Deserialize)]
 pub struct AsrHealth {
@@ -342,27 +358,84 @@ pub struct SpeechRuntimeConfig {
 
 impl SpeechRuntimeConfig {
     pub fn from_env() -> Result<Self> {
-        let adapter = match std::env::var("JMCP_SPEECH_ADAPTER") {
-            Ok(value) if !value.trim().is_empty() => SpeechAdapterKind::parse(&value)?,
-            _ => SpeechAdapterKind::LegacyCascade,
+        let adapter = match optional_first_env(&["JMCP_TALK_ADAPTER", "JMCP_SPEECH_ADAPTER"]) {
+            Some(value) => SpeechAdapterKind::parse(&value)?,
+            None => SpeechAdapterKind::LegacyCascade,
         };
         Ok(Self {
             adapter,
-            asr_url: env_url("JMCP_ASR_URL", DEFAULT_ASR_URL),
-            tts_url: env_url("JMCP_TTS_URL", DEFAULT_TTS_URL),
-            minicpm_o45_url: std::env::var("MINICPM_O45_URL")
-                .ok()
-                .filter(|value| !value.trim().is_empty()),
-            minicpm_o45_quantization: std::env::var("MINICPM_O45_QUANTIZATION")
-                .unwrap_or_else(|_| "int4".to_owned()),
-            minicpm_o45_device: std::env::var("MINICPM_O45_DEVICE")
-                .unwrap_or_else(|_| "cuda:0".to_owned()),
-            deterministic_transcript: std::env::var("JMCP_DETERMINISTIC_TRANSCRIPT")
-                .unwrap_or_else(|_| "deterministic speech turn".to_owned()),
-            minicpm_fixture_transcript: std::env::var("MINICPM_O45_FIXTURE_TRANSCRIPT")
-                .ok()
-                .filter(|value| !value.trim().is_empty()),
+            asr_url: first_env(&["JMCP_TALK_ASR_URL", "JMCP_ASR_URL"], DEFAULT_ASR_URL),
+            tts_url: first_env(&["JMCP_TALK_TTS_URL", "JMCP_TTS_URL"], DEFAULT_TTS_URL),
+            minicpm_o45_url: optional_first_env(&["JMCP_TALK_MINICPM_O45_URL", "MINICPM_O45_URL"]),
+            minicpm_o45_quantization: first_env(
+                &[
+                    "JMCP_TALK_MINICPM_O45_QUANTIZATION",
+                    "MINICPM_O45_QUANTIZATION",
+                ],
+                "int4",
+            ),
+            minicpm_o45_device: first_env(
+                &["JMCP_TALK_MINICPM_O45_DEVICE", "MINICPM_O45_DEVICE"],
+                "cuda:0",
+            ),
+            deterministic_transcript: first_env(
+                &[
+                    "JMCP_TALK_DETERMINISTIC_TRANSCRIPT",
+                    "JMCP_DETERMINISTIC_TRANSCRIPT",
+                ],
+                "deterministic speech turn",
+            ),
+            minicpm_fixture_transcript: optional_first_env(&[
+                "JMCP_TALK_MINICPM_O45_FIXTURE_TRANSCRIPT",
+                "MINICPM_O45_FIXTURE_TRANSCRIPT",
+            ]),
         })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SpeechTraceStatus {
+    Started,
+    Done,
+    Failed,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SpeechTraceEvent {
+    pub name: &'static str,
+    pub status: SpeechTraceStatus,
+    pub adapter: SpeechAdapterKind,
+    pub model: &'static str,
+    pub error_class: Option<String>,
+}
+
+impl SpeechTraceEvent {
+    pub fn new(
+        name: &'static str,
+        status: SpeechTraceStatus,
+        health: &SpeechRuntimeHealth,
+    ) -> Self {
+        Self {
+            name,
+            status,
+            adapter: health.adapter,
+            model: health.model,
+            error_class: None,
+        }
+    }
+
+    pub fn failed(
+        name: &'static str,
+        health: &SpeechRuntimeHealth,
+        error_class: impl Into<String>,
+    ) -> Self {
+        Self {
+            name,
+            status: SpeechTraceStatus::Failed,
+            adapter: health.adapter,
+            model: health.model,
+            error_class: Some(error_class.into()),
+        }
     }
 }
 
