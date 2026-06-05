@@ -131,15 +131,16 @@ impl AsrClient {
         audio: Vec<u8>,
         language: Option<&str>,
     ) -> Result<Transcription> {
-        let mut url = format!("{}/transcribe", self.base_url);
-        if let Some(language) = language {
-            url.push_str(&format!("?language={language}"));
-        }
-        let response = self
+        let url = format!("{}/transcribe", self.base_url);
+        let mut request = self
             .http
             .post(&url)
             .header("content-type", "audio/wav")
-            .body(audio)
+            .body(audio);
+        if let Some(language) = language {
+            request = request.query(&[("language", language)]);
+        }
+        let response = request
             .send()
             .await
             .with_context(|| format!("POST {url}"))?;
@@ -247,11 +248,33 @@ impl TtsClient {
             .send()
             .await
             .with_context(|| format!("POST {url}"))?;
-        let bytes = response
-            .error_for_status()?
-            .bytes()
-            .await
-            .context("read TTS audio bytes")?;
+        let response = response.error_for_status()?;
+        let content_type = match response.headers().get(reqwest::header::CONTENT_TYPE) {
+            Some(value) => value
+                .to_str()
+                .context("parse TTS content-type header")?
+                .to_owned(),
+            None => anyhow::bail!(
+                "TTS response omitted content-type for a {} response",
+                format.query()
+            ),
+        };
+        if content_type.trim().is_empty() {
+            anyhow::bail!(
+                "TTS response contained an empty content-type for a {} response",
+                format.query()
+            );
+        }
+        let bytes = response.bytes().await.context("read TTS audio bytes")?;
+        if bytes.is_empty() {
+            anyhow::bail!(
+                "TTS returned an empty body for a {} response",
+                format.query()
+            );
+        }
+        if !content_type.starts_with("audio/") {
+            anyhow::bail!("TTS returned non-audio content-type {content_type:?}");
+        }
         Ok(bytes.to_vec())
     }
 }

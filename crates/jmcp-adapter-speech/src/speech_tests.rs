@@ -163,3 +163,46 @@ async fn tts_synthesize_as_ogg_requests_ogg_and_returns_bytes() {
         "client must request ?format=ogg, got: {request_line}"
     );
 }
+
+#[tokio::test]
+async fn tts_synthesize_rejects_empty_audio_body() {
+    // A 200 with no audio bytes must not be handed off as a voice note.
+    let url = stub_server("200 OK", "audio/ogg", Vec::new());
+    let result = TtsClient::new(url).synthesize("approve", None, None).await;
+    assert!(
+        result.is_err(),
+        "200 with an empty body must surface as an error, not empty audio"
+    );
+}
+
+#[tokio::test]
+async fn tts_synthesize_rejects_json_error_body() {
+    // The daemon can answer 200 with a JSON error envelope; that is not audio.
+    let url = stub_server(
+        "200 OK",
+        "application/json",
+        br#"{"error":"voice not loaded"}"#.to_vec(),
+    );
+    let result = TtsClient::new(url).synthesize("approve", None, None).await;
+    assert!(
+        result.is_err(),
+        "200 with a non-audio content-type must surface as an error"
+    );
+}
+
+#[tokio::test]
+async fn transcribe_percent_encodes_language() {
+    // A crafted language must not inject extra query parameters into the request.
+    let (url, seen) = stub_server_capturing(
+        "application/json",
+        br#"{"text":"x","language":"zh","segments":[]}"#.to_vec(),
+    );
+    let _ = AsrClient::new(url)
+        .transcribe(b"x".to_vec(), Some("zh-Hant&beam_size=99"))
+        .await;
+    let request_line = seen.lock().unwrap().clone();
+    assert!(
+        !request_line.contains("beam_size=99"),
+        "language must be encoded, not injected as a separate param: {request_line}"
+    );
+}
