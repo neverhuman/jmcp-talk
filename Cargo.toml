@@ -9,6 +9,7 @@ members = [
     "crates/jmcp-app",
     "crates/jmcp-api",
     "crates/jmcp-now",
+    "crates/jmcp-intel",
     "crates/jmcp-adapter-sdk",
     "crates/jmcp-adapter-jankurai",
     "crates/jmcp-adapter-jailgun",

@@ -1309,6 +1309,22 @@ name = "jmcp-domain-boundary"
 version = "0.1.0"
 
 [[package]]
+name = "jmcp-intel"
+version = "0.1.0"
+dependencies = [
+ "arc-swap",
+ "async-trait",
+ "chrono",
+ "jmcp-app",
+ "jmcp-domain",
+ "jmcp-now",
+ "jmcp-store",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
 name = "jmcp-now"
 version = "0.1.0"
 dependencies = [
