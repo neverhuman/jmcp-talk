@@ -1,22 +1,6 @@
 [workspace]
 members = [
-    "crates/jcp-core",
-    "crates/jmcp-domain",
-    "crates/jmcp-store",
-    "crates/jmcp-attention",
-    "crates/jmcp-app",
-    "crates/jmcp-api",
-    "crates/jmcp-adapter-sdk",
-    "crates/jmcp-adapter-jankurai",
-    "crates/jmcp-adapter-jailgun",
-    "crates/jmcp-adapter-jeryu",
-    "crates/jmcp-adapter-jekko",
     "crates/jmcp-adapter-speech",
-    "crates/jmcp-approval-telegram",
-    "crates/jmcp-conformance",
-    "apps/jmcpd",
-    "apps/jmcpctl",
-    "apps/jmcp-tui",
 ]
 resolver = "2"
 
