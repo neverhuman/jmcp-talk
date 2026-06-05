@@ -15,6 +15,7 @@ members = [
     "crates/jmcp-adapter-jeryu",
     "crates/jmcp-adapter-jekko",
     "crates/jmcp-adapter-speech",
+    "crates/jmcp-agent-bus",
     "crates/jmcp-approval-telegram",
     "crates/jmcp-conformance",
     "crates/jmcp-ci-tools",

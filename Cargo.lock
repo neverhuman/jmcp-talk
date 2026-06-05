@@ -1177,6 +1177,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "jmcp-agent-bus"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "jmcp-domain",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "jmcp-api"
 version = "0.1.0"
 dependencies = [
@@ -1185,6 +1195,7 @@ dependencies = [
  "chrono",
  "jcp-core",
  "jmcp-adapter-jeryu",
+ "jmcp-agent-bus",
  "jmcp-app",
  "jmcp-domain",
  "jmcp-now",
@@ -1209,6 +1220,7 @@ dependencies = [
  "hex",
  "jcp-core",
  "jmcp-adapter-jekko",
+ "jmcp-agent-bus",
  "jmcp-attention",
  "jmcp-broker",
  "jmcp-domain",
