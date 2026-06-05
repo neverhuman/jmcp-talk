@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/domain",
     "crates/jcp-core",
     "crates/jmcp-domain",
     "crates/jmcp-broker",
