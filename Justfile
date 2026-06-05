@@ -72,7 +72,7 @@ ux-qa-package-test:
 score: score-advisory
 
 score-advisory:
-    jankurai audit . --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md --score-history .jankurai/score-history.jsonl --score-history-csv .jankurai/score-history.csv
+    jankurai audit . --full --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md --score-history .jankurai/score-history.jsonl --score-history-csv .jankurai/score-history.csv
 
 proof-routing:
     jankurai proof . --changed-from "${JANKURAI_BASE_REF:-origin/main}" --out target/jankurai/proof-routing.json --md target/jankurai/proof-routing.md
@@ -107,6 +107,10 @@ rust-diagnose:
 contract-drift:
     bash ops/ci/contract-drift.sh
 
+coverage-proof:
+    cargo run -q -p jmcp-ci-tools -- mock-coverage --config agent/coverage-sources.toml --out target/jankurai/coverage/mock-coverage.json
+    jankurai coverage audit . --config agent/coverage-sources.toml --json target/jankurai/coverage/coverage-audit.json --md target/jankurai/coverage/coverage-audit.md
+
 cost-budget:
     bash ops/ci/cost-budget.sh
 
@@ -125,4 +129,4 @@ input-boundary:
 agent-tool-supply:
     jankurai audit . --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md
 
-check: fast build test security conformance contract-drift db-migration-analyze ux-qa cost-budget release-readiness score rust-map rust-witness rust-diagnose
+check: fast build test security conformance contract-drift coverage-proof db-migration-analyze ux-qa cost-budget release-readiness score rust-map rust-witness rust-diagnose
