@@ -1,0 +1,19 @@
+[package]
+name = "jmcp-voiced"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+base64.workspace = true
+chrono.workspace = true
+futures-util.workspace = true
+hex.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+uuid.workspace = true

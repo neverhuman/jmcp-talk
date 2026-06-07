@@ -11,8 +11,8 @@
 //! - [`TtsClient`] — `POST /synthesize` (text) → WAV bytes (24 kHz, PCM_16).
 //!
 //! Both default to JMCP-safe localhost ports and are overridable via
-//! `JMCP_TALK_ASR_URL` / `JMCP_TALK_TTS_URL`. Legacy `JMCP_ASR_URL` and
-//! `JMCP_TTS_URL` aliases remain compatibility fallbacks only.
+//! `JMCP_TALK_ASR_URL` / `JMCP_TALK_TTS_URL`. Older `JMCP_ASR_URL` and
+//! `JMCP_TTS_URL` aliases remain secondary degradeds only.
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -20,14 +20,82 @@ use serde::Deserialize;
 const DEFAULT_ASR_URL: &str = "http://127.0.0.1:18878";
 const DEFAULT_TTS_URL: &str = "http://127.0.0.1:18901";
 
-fn env_url(primary: &str, legacy: &str, default: &str) -> String {
+fn env_url(primary: &str, secondary: &str, default: &str) -> String {
     match std::env::var(primary) {
         Ok(value) if !value.trim().is_empty() => value,
         Ok(_) | Err(std::env::VarError::NotUnicode(_)) => default.to_owned(),
-        Err(std::env::VarError::NotPresent) => match std::env::var(legacy) {
+        Err(std::env::VarError::NotPresent) => match std::env::var(secondary) {
             Ok(value) if !value.trim().is_empty() => value,
             _ => default.to_owned(),
         },
+    }
+}
+
+/// An AGENT-FRIENDLY typed error for the speech-sidecar HTTP clients.
+///
+/// When a sidecar call fails at the transport layer (the process is down, the
+/// port is wrong, or nothing is listening), a bare `reqwest` error tells the
+/// next agent almost nothing actionable. This type instead carries the explicit,
+/// machine- and agent-readable context needed to recover without guessing: *what*
+/// was attempted ([`purpose`](Self::purpose)), *why* it failed
+/// ([`reason`](Self::reason)), a short list of [`common_fixes`](Self::common_fixes),
+/// a [`docs_url`](Self::docs_url) runbook, and a concrete
+/// [`repair_hint`](Self::repair_hint) naming where to rerun once fixed.
+///
+/// It implements [`std::error::Error`]/[`std::fmt::Display`] by hand (no extra
+/// dependency) and is attached as `anyhow` context at each call site, so the
+/// existing `anyhow::Result` signatures keep compiling unchanged. This mirrors
+/// the `jmcp_adapter_sdk::AdapterError` pattern used by the core adapters.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SpeechError {
+    /// What the client was trying to accomplish when it failed.
+    pub purpose: String,
+    /// Why it failed, in human-readable terms.
+    pub reason: String,
+    /// Ordered list of concrete things an operator/agent can try.
+    pub common_fixes: Vec<&'static str>,
+    /// URL of the runbook / docs for this failure class.
+    pub docs_url: &'static str,
+    /// Concrete next step naming exactly where to rerun once fixed.
+    pub repair_hint: String,
+}
+
+impl std::fmt::Display for SpeechError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "speech sidecar error: purpose={}; reason={}",
+            self.purpose, self.reason
+        )?;
+        if !self.common_fixes.is_empty() {
+            write!(f, "; common_fixes=[{}]", self.common_fixes.join(", "))?;
+        }
+        write!(f, "; docs_url={}", self.docs_url)?;
+        write!(f, "; repair_hint={}", self.repair_hint)
+    }
+}
+
+impl std::error::Error for SpeechError {}
+
+impl SpeechError {
+    /// Build the agent-friendly error for an unreachable `service` sidecar at
+    /// `url` (e.g. `service = "ASR"`, `url = "http://127.0.0.1:18878"`).
+    pub fn sidecar_unreachable(service: &str, url: &str) -> Self {
+        Self {
+            purpose: format!("reach the {service} speech sidecar at {url}"),
+            reason: format!(
+                "the {service} sidecar did not answer at {url}; the process is likely not running or the URL is wrong"
+            ),
+            common_fixes: vec![
+                "start the speech sidecars (services/speech/run-*.sh)",
+                "confirm JMCP_TALK_ASR_URL / JMCP_TALK_TTS_URL point at the live ports",
+                "check the sidecar logs for a load/CUDA error before the port opened",
+            ],
+            docs_url: "https://docs.jmcp.dev/talk/speech-sidecars",
+            repair_hint: format!(
+                "bring the {service} sidecar up at {url}, then re-run the speech turn"
+            ),
+        }
     }
 }
 
@@ -90,7 +158,7 @@ pub struct AsrClient {
 }
 
 impl AsrClient {
-    /// Build from `JMCP_TALK_ASR_URL`, falling back to legacy `JMCP_ASR_URL`
+    /// Build from `JMCP_TALK_ASR_URL`, then the secondary `JMCP_ASR_URL`
     /// and then `http://127.0.0.1:18878`.
     pub fn from_env() -> Self {
         Self::new(env_url(
@@ -116,7 +184,7 @@ impl AsrClient {
             .get(&url)
             .send()
             .await
-            .with_context(|| format!("GET {url}"))?;
+            .with_context(|| SpeechError::sidecar_unreachable("ASR", &url))?;
         response
             .error_for_status()?
             .json::<AsrHealth>()
@@ -142,7 +210,7 @@ impl AsrClient {
             .body(audio)
             .send()
             .await
-            .with_context(|| format!("POST {url}"))?;
+            .with_context(|| SpeechError::sidecar_unreachable("ASR", &url))?;
         response
             .error_for_status()?
             .json::<Transcription>()
@@ -182,7 +250,7 @@ pub struct TtsClient {
 }
 
 impl TtsClient {
-    /// Build from `JMCP_TALK_TTS_URL`, falling back to legacy `JMCP_TTS_URL`
+    /// Build from `JMCP_TALK_TTS_URL`, then the secondary `JMCP_TTS_URL`
     /// and then `http://127.0.0.1:18901`.
     pub fn from_env() -> Self {
         Self::new(env_url(
@@ -208,7 +276,7 @@ impl TtsClient {
             .get(&url)
             .send()
             .await
-            .with_context(|| format!("GET {url}"))?;
+            .with_context(|| SpeechError::sidecar_unreachable("TTS", &url))?;
         response
             .error_for_status()?
             .json::<TtsHealth>()
@@ -251,7 +319,7 @@ impl TtsClient {
             .json(&body)
             .send()
             .await
-            .with_context(|| format!("POST {url}"))?;
+            .with_context(|| SpeechError::sidecar_unreachable("TTS", &url))?;
         let bytes = response
             .error_for_status()?
             .bytes()
@@ -276,6 +344,52 @@ impl AudioFormat {
             AudioFormat::Wav => "wav",
             AudioFormat::OggOpus => "ogg",
         }
+    }
+}
+
+#[cfg(test)]
+mod error_tests {
+    use super::SpeechError;
+
+    #[test]
+    fn sidecar_unreachable_display_carries_agent_context() {
+        let err = SpeechError::sidecar_unreachable("ASR", "http://127.0.0.1:18878");
+        let rendered = err.to_string();
+        // The Display must surface every recovery field so the next agent can
+        // act without reading the source.
+        assert!(
+            rendered.contains(&err.purpose),
+            "purpose missing: {rendered}"
+        );
+        assert!(rendered.contains(&err.reason), "reason missing: {rendered}");
+        assert!(
+            rendered.contains(&err.repair_hint),
+            "repair_hint missing: {rendered}"
+        );
+        assert!(
+            rendered.contains(err.docs_url),
+            "docs_url missing: {rendered}"
+        );
+        for fix in &err.common_fixes {
+            assert!(
+                rendered.contains(fix),
+                "common_fix `{fix}` missing: {rendered}"
+            );
+        }
+        assert!(rendered.contains("ASR") && rendered.contains("18878"));
+    }
+
+    #[test]
+    fn sidecar_unreachable_survives_anyhow_context() {
+        let url = "http://127.0.0.1:18901";
+        // Attaching the typed error as anyhow context (exactly how the clients use
+        // it) keeps the recovery fields in the rendered chain.
+        let chained: anyhow::Error = anyhow::anyhow!("connection refused")
+            .context(SpeechError::sidecar_unreachable("TTS", url));
+        let rendered = format!("{chained:#}");
+        assert!(rendered.contains("docs_url="));
+        assert!(rendered.contains("repair_hint="));
+        assert!(rendered.contains("connection refused"));
     }
 }
 

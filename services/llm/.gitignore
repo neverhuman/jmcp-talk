@@ -3,6 +3,7 @@
 .venv-omni/
 models/
 *.wav
+!assets/ref_audio/jmcp_friendly_male_16k.wav
 *.safetensors
 *.bin
 *.pt

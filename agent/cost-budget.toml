@@ -1,0 +1,15 @@
+default_external_spend_usd = 0
+default_network_spend_usd = 0
+kill_switch_env = "JMCP_COST_KILL_SWITCH"
+receipt_path = "target/jankurai/cost-budget.json"
+
+[quota_caps]
+external_api_usd = 0
+model_api_usd = 0
+gpu_cloud_usd = 0
+
+[stop_conditions]
+on_missing_receipt = true
+on_unknown_paid_tool = true
+on_quota_exceeded = true
+on_kill_switch = true

@@ -72,7 +72,7 @@ struct TraceEvent {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let bind = std::env::var("JMCP_TALK_BIND").unwrap_or_else(|_| DEFAULT_BIND.to_owned());
+    let bind = env_or("JMCP_TALK_BIND", DEFAULT_BIND);
     let addr: SocketAddr = bind.parse()?;
     let state = AppState {
         config: Arc::new(SpeechConfig::from_env()),
@@ -200,10 +200,10 @@ async fn synthesize(
 }
 
 fn env_or(key: &str, default: &str) -> String {
-    std::env::var(key)
-        .ok()
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| default.to_owned())
+    match std::env::var(key) {
+        Ok(value) if !value.trim().is_empty() => value,
+        _ => default.to_owned(),
+    }
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {

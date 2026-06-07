@@ -3,7 +3,9 @@ use std::net::TcpListener;
 use std::sync::Mutex;
 use std::thread;
 
-use super::{AsrClient, TtsClient};
+use proptest::prelude::*;
+
+use super::{AsrClient, AudioFormat, TtsClient};
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
@@ -168,20 +170,20 @@ async fn tts_synthesize_as_ogg_requests_ogg_and_returns_bytes() {
 }
 
 #[tokio::test]
-async fn talk_env_takes_precedence_over_legacy_asr_alias() {
+async fn talk_env_takes_precedence_over_secondary_asr_alias() {
     let _guard = ENV_LOCK.lock().unwrap();
     let primary = stub_server(
         "200 OK",
         "application/json",
         br#"{"ok":true,"model":"primary","device":"cpu","loaded":true}"#.to_vec(),
     );
-    let legacy = stub_server(
+    let secondary = stub_server(
         "200 OK",
         "application/json",
-        br#"{"ok":true,"model":"legacy","device":"cpu","loaded":true}"#.to_vec(),
+        br#"{"ok":true,"model":"secondary","device":"cpu","loaded":true}"#.to_vec(),
     );
     std::env::set_var("JMCP_TALK_ASR_URL", &primary);
-    std::env::set_var("JMCP_ASR_URL", &legacy);
+    std::env::set_var("JMCP_ASR_URL", &secondary);
 
     let client = AsrClient::from_env();
     std::env::remove_var("JMCP_TALK_ASR_URL");
@@ -193,20 +195,35 @@ async fn talk_env_takes_precedence_over_legacy_asr_alias() {
 }
 
 #[tokio::test]
-async fn legacy_tts_alias_still_works_when_talk_env_absent() {
+async fn secondary_tts_alias_still_works_when_talk_env_absent() {
     let _guard = ENV_LOCK.lock().unwrap();
-    let legacy = stub_server(
+    let secondary = stub_server(
         "200 OK",
         "application/json",
-        br#"{"ok":true,"model":"legacy-tts","device":"cpu","loaded":true}"#.to_vec(),
+        br#"{"ok":true,"model":"secondary-tts","device":"cpu","loaded":true}"#.to_vec(),
     );
     std::env::remove_var("JMCP_TALK_TTS_URL");
-    std::env::set_var("JMCP_TTS_URL", &legacy);
+    std::env::set_var("JMCP_TTS_URL", &secondary);
 
     let client = TtsClient::from_env();
     std::env::remove_var("JMCP_TTS_URL");
     drop(_guard);
 
     let health = client.health().await.unwrap();
-    assert_eq!(health.model, "legacy-tts");
+    assert_eq!(health.model, "secondary-tts");
+}
+
+proptest! {
+    #[test]
+    fn audio_format_query_stays_within_sidecar_contract(use_ogg in any::<bool>()) {
+        let format = if use_ogg {
+            AudioFormat::OggOpus
+        } else {
+            AudioFormat::Wav
+        };
+
+        let query = format.query();
+        prop_assert!(matches!(query, "wav" | "ogg"));
+        prop_assert_eq!(query == "ogg", use_ogg);
+    }
 }

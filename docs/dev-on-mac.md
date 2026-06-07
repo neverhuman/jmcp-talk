@@ -44,7 +44,7 @@ The launchers auto-detect the device, so they "just work":
 
 ```bash
 ./services/speech/run-asr.sh   # no NVIDIA GPU -> CPU + int8 automatically
-./services/speech/run-tts.sh   # Kokoro-82M -> CPU (fast on M-series)
+./services/speech/run-tts.sh   # VoxCPM2 by default; Kokoro degraded mode if unavailable
 ```
 
 - **ASR** (faster-whisper / CTranslate2) has **no Metal/MPS backend**, so the Mac
@@ -52,9 +52,10 @@ The launchers auto-detect the device, so they "just work":
   is absent). The model default remains `distil-small.en` for parity with the
   realtime CUDA profile. For explicit accuracy checks, override with
   `ASR_MODEL=large-v3 ASR_BEAM_SIZE=5`.
-- **TTS** (Kokoro-82M, PyTorch) defaults to CPU. To try Metal: `TTS_DEVICE=mps
-  ./services/speech/run-tts.sh` (most ops are MPS-supported; fall back to CPU if a
-  kernel is missing).
+- **TTS** defaults to VoxCPM2 with the `jmcp_male_v1` profile. For a lighter Mac
+  degraded, run `TTS_ENGINE=kokoro ./services/speech/run-tts.sh`. To try Metal:
+  `TTS_DEVICE=mps ./services/speech/run-tts.sh` (fall back to CPU if a kernel is
+  missing).
 - Ports are unchanged and JMCP-safe: ASR `127.0.0.1:18878`, TTS `127.0.0.1:18901`.
 - Round-trip check once both are up: `./services/speech/selftest.sh`.
 

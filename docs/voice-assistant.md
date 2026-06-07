@@ -1,162 +1,96 @@
-# JMCP Local Voice Assistant + Reasoning Model
+# JMCP Local Voice Assistant
 
-A fully on-box, private voice assistant. The browser captures the microphone, a
-local ASR sidecar transcribes, a local reasoning LLM answers, and a local TTS
-sidecar speaks the reply back. No audio or text ever leaves the machine.
+JMCP live voice is owned by `jmcp-talk`. The browser captures microphone audio
+and plays returned audio, but ASR/TTS/model protocol details stay behind the
+`jmcp-talk` gateway. Core authority remains in `jmcp-core` through the cockpit
+`/jmcp` proxy.
 
-The fast path is the co-resident GPU profile launched by
-`services/llm/realtime-voice.sh`: Qwen3-30B-A3B at context 8192, ASR
-`distil-small.en` on CUDA float16 with beam 1, and Kokoro TTS on CUDA.
-
-## 1. Architecture
+## Architecture
 
 ```
-browser mic
-   |  (continuous capture)
+browser mic / typed input
+   |
+   | same-origin /voice and /voice-ws through cockpit :8080
    v
-energy VAD  ──segments each utterance──>  local ASR  (distil-small.en, :18878)
-   |                                            |
-   |                                       transcript text
-   v                                            v
-spoken command  ───────────────────>  local vLLM reasoning  (:18902)
-                                            |
-                                       one/two-sentence reply
-                                            v
-                                     local TTS  (Kokoro, :18901)
-                                            |
-                                         playback
+jmcp-talk Rust live voice gateway (:8040)
+   |
+   | private loopback HTTP/WebSocket
+   v
+ASR (:18878) -> text LLM (:18902/v1) -> VoxCPM2 TTS (:18901)
 ```
 
-- The mic runs continuously in the browser. A lightweight energy VAD (RMS
-  threshold) decides where each spoken utterance starts and ends.
-- Once the widget is active, each spoken turn is treated as a command. The
-  wake-word parser remains tested for compatibility, but the cockpit fast path
-  avoids an extra activation turn.
-- The command is sent to the local vLLM `/v1/chat/completions` endpoint with a
-  short system prompt asking for one or two spoken sentences.
-- The reply is synthesized by the local TTS sidecar and played back.
-- Barge-in: talking over the assistant cancels playback immediately and starts
-  capturing your next utterance.
+- Live voice uses the Rust `jmcp-voiced` gateway, local ASR, text reasoning,
+  and streaming VoxCPM2 TTS.
+- The default voice profile is `jmcp_male_v1`, backed by a VoxCPM2 voice-design
+  manifest at `services/speech/voice_profiles/jmcp_male_v1.json`.
+- The `jmcp_male_v1` profile is not derived from MiniCPM demo reference audio.
+- The cockpit does not call `/asr`, `/tts`, or `/llm` directly in live mode.
+- Deterministic `jmcp-speechd` remains for CI and split smoke fixtures.
+- For current live debugging, `JMCP_TALK_CAPTURE_RAW_AUDIO=1` writes local WAV
+  snippets, playback underruns, TTS timings, and JSONL logs under `JMCP_TALK_AUDIO_DIR`
+  (`/home/ubuntu/jmcp-split/.live/audio` by default).
 
-The widget is a floating mic control mounted only on the standalone cockpit. Its
-states are: voice off, listening, transcribing, thinking, speaking, and error.
-
-## 2. Bring-up
+## Bring-Up
 
 ```bash
-# 1. Start the realtime GPU voice stack: ASR + TTS + Qwen3-30B-A3B.
-#    First run creates venvs and downloads weights into the shared HF cache.
+# Run the realtime stack: ASR, VoxCPM2 TTS, LLM, and gateway.
 ./services/llm/realtime-voice.sh
 
-# 2. Start the cockpit web UI (defaults to 127.0.0.1:15873):
-npm --workspace @jmcp/cockpit run dev
+# Or run only the gateway after ASR/TTS/LLM are already up.
+./services/llm/run-voice-gateway.sh
+
+# Or start the split live stack through jmcp-deploy.
+cd /home/ubuntu/jmcp-split/jmcp-deploy
+ops/split/launch.sh --run
 ```
 
-Then open the cockpit in a browser, click the floating mic widget to start, and speak.
+Cockpit listens on `127.0.0.1:8080` and proxies:
 
-The widget shows what it heard and the spoken reply as text alongside the audio.
-
-The cockpit reaches the three local services through the Vite dev proxy
-(`/asr`, `/tts`, `/llm`), so the browser stays same-origin with no CORS and audio
-stays on the machine.
-
-## 3. Ports
-
-| Service | Bind | Notes |
+| Browser path | Target | Notes |
 |---|---|---|
-| ASR (faster-whisper) | `127.0.0.1:18878` | `GET /health`, `POST /transcribe` |
-| TTS (Kokoro) | `127.0.0.1:18901` | `GET /health`, `POST /synthesize` |
-| Reasoning LLM (vLLM) | `127.0.0.1:18902` | OpenAI-compatible `/v1` API |
-| Cockpit (Vite dev) | `127.0.0.1:15873` | proxies `/asr`, `/tts`, `/llm` |
+| `/jmcp` | `127.0.0.1:18877` | core control-plane API |
+| `/voice` | `127.0.0.1:8040` | voice health, events, metrics |
+| `/voice-ws` | `127.0.0.1:8040/ws` | local voice sessions |
 
-All four are JMCP-safe ports. None of them is ever a Jeryu-protected port
-(`2224`, `8787`, `8799`, `8929`, `18787`, `18788`, `19800`); the cockpit refuses
-to start on any of those.
+## Ports
 
-## 4. GPU / VRAM
+| Service | Bind | Owner |
+|---|---:|---|
+| Cockpit | `127.0.0.1:8080` | `jmcp-web` |
+| Core API | `127.0.0.1:18877` | `jmcp-core` |
+| JMCP voice gateway | `127.0.0.1:8040` | `jmcp-talk` |
+| ASR sidecar | `127.0.0.1:18878` | private `jmcp-talk` upstream |
+| TTS sidecar | `127.0.0.1:18901` | private `jmcp-talk` upstream |
+| LLM sidecar | `127.0.0.1:18902` | private `jmcp-talk` upstream |
+| Comni gateway | `127.0.0.1:18040` | MiniCPM debug lane |
 
-This box is a single RTX 3090 (24 GB). The realtime voice launcher keeps the
-30B-A3B AWQ model at `LLM_GPU_UTIL=0.80` and `LLM_MAX_LEN=8192`, leaving enough
-headroom for ASR `distil-small.en` and Kokoro TTS to stay on CUDA.
-
-For an explicit accuracy or isolation run, you can still move speech off the GPU
-or choose a larger ASR model manually:
+## Verify
 
 ```bash
-./services/llm/dedicate-gpu.sh dedicate
-ASR_MODEL=large-v3 ASR_BEAM_SIZE=5 ./services/speech/run-asr.sh
-```
-
-## 5. Configuration knobs
-
-LLM sidecar (`services/llm/run-llm.sh`):
-
-| Env | Default | Meaning |
-|---|---|---|
-| `LLM_MODEL` | `cpatonn/Qwen3-30B-A3B-Instruct-2507-AWQ-4bit` | model repo vLLM serves |
-| `LLM_SERVED_NAME` | `local/qwen3-30b-a3b` | name clients send as `model` |
-| `LLM_PORT` | `18902` | bind port |
-| `LLM_GPU_UTIL` | `0.92` (`0.80` in realtime launcher) | GPU memory fraction for vLLM |
-| `LLM_MAX_LEN` | `32768` (`8192` in realtime launcher) | max context length |
-| `LLM_QUANT` | _unset_ | force a quantization kernel (e.g. `awq_marlin`) |
-
-Speech device placement (`dedicate-gpu.sh` / `run-asr.sh` / `run-tts.sh`):
-
-| Env | Meaning |
-|---|---|
-| `ASR_MODEL` | default `distil-small.en`; set `large-v3` only for accuracy overrides |
-| `ASR_DEVICE` | `cuda` in realtime launcher or `cpu` for dedicated/isolation mode |
-| `ASR_COMPUTE` | `float16` on CUDA, `int8` on CPU |
-| `ASR_BEAM_SIZE` | default `1`; set higher only for accuracy overrides |
-| `TTS_DEVICE` | `cuda` in realtime launcher, `auto` in standalone runner, or `cpu` for dedicated/isolation mode |
-
-Cockpit proxy targets (`apps/cockpit/vite.config.ts`) and voice model:
-
-| Env | Default | Meaning |
-|---|---|---|
-| `VITE_ASR_TARGET` | `http://127.0.0.1:18878` | where `/asr` is proxied |
-| `VITE_TTS_TARGET` | `http://127.0.0.1:18901` | where `/tts` is proxied |
-| `VITE_LLM_TARGET` | `http://127.0.0.1:18902` | where `/llm` is proxied |
-| `VITE_LLM_MODEL` | `local/qwen3-30b-a3b` | `model` the voice client sends |
-
-`VITE_LLM_MODEL` must match `LLM_SERVED_NAME` so vLLM accepts the request. The
-cockpit host and port come from `JMCP_COCKPIT_HOST` (`127.0.0.1`) and
-`JMCP_COCKPIT_PORT` (`15873`).
-
-## 6. Verify
-
-```bash
-# LLM up?
-curl -s http://127.0.0.1:18902/health
-
-# One reasoning turn (served name must match LLM_SERVED_NAME / VITE_LLM_MODEL):
-curl -s http://127.0.0.1:18902/v1/chat/completions \
-  -H 'content-type: application/json' \
-  -d '{"model":"local/qwen3-30b-a3b","messages":[{"role":"user","content":"In one sentence, what is JMCP?"}]}'
-
-# Speech sidecars up?
-curl -s http://127.0.0.1:18878/health
-curl -s http://127.0.0.1:18901/health
-
-# Round-trip check:
-./services/speech/selftest.sh
-
-# GPU occupancy — realtime mode should retain at least about 1 GB headroom:
+curl http://127.0.0.1:8080/jmcp/health
+curl http://127.0.0.1:8080/voice/health  # includes voice_engine/profile/hash/sample_rate
+curl http://127.0.0.1:8040/metrics
+./services/llm/smoke-real-tts.py --runs 5 --strict
+./services/llm/smoke-real-voice-turn.py --mode both --runs 3 --strict
 nvidia-smi
 ```
 
-## 7. Routing JMCP `reason` work orders to the local model
+The smoke scripts are explicit live checks for the Rust gateway and VoxCPM2
+lane. They keep raw WAV artifacts local under `.live/audio` and only write
+stripped frame/timing summaries and listening packets.
 
-The same local vLLM endpoint can serve JMCP's own `reason` work orders, with no
-Rust changes. Add a provider block to `~/jnoccio/config/router.toml`:
+The split launcher writes live logs under
+`/home/ubuntu/jmcp-split/.live/logs/`, including `voice-events.jsonl` and the
+GPU memory snapshot taken at launch.
+Raw audio snippets for post-analysis are written under
+`/home/ubuntu/jmcp-split/.live/audio/<turn_id>/`:
 
-```toml
-[providers.local_vllm]
-enabled  = true
-api_base = "http://127.0.0.1:18902/v1"
-models   = ["local/qwen3-30b-a3b"]   # must equal --served-model-name
-```
+- `input_*.wav`: browser mic snippets, 16 kHz mono.
+- `output_chunk_*.wav`: streamed assistant chunks, usually 48 kHz mono.
+- `events.jsonl`: redacted turn, playback, VAD, profile, and timing events.
 
-Then a JMCP `reason` work order with `JEKKO_MODEL=local/qwen3-30b-a3b` routes to
-the local model: `jmcp-adapter-jekko` POSTs to
-`{jnoccio}/v1/chat/completions`.
+## Legacy Fixtures
+
+MiniCPM/Comni is now the debug lane, not the default cockpit speaking path. Run
+`services/llm/run-minicpm-o45.sh` on a non-8040 bind when testing it alongside
+the local voice gateway.

@@ -1,0 +1,9 @@
+{
+  "id": "jmcp_male_v1",
+  "engine": "openbmb/VoxCPM2",
+  "sample_rate": 48000,
+  "provenance": "VoxCPM2 voice-design profile generated from a local text prompt only; no MiniCPM demo reference audio is used.",
+  "license": "Apache-2.0",
+  "design_prompt": "A warm American male baritone engineering copilot voice, calm and human, close-mic studio quality, concise delivery, natural breath, steady pace, low fatigue, no announcer affect.",
+  "created_at": "2026-06-06T00:00:00.000Z"
+}

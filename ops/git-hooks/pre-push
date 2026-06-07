@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+exec bash "${repo_root}/ops/ci/ci.sh"

@@ -7,7 +7,7 @@ engine: thin Rust clients (`crates/jmcp-adapter-speech`) call them over HTTP.
 | Sidecar | Model | Port | License | Endpoints |
 |---------|-------|------|---------|-----------|
 | ASR | faster-whisper **distil-small.en** (CTranslate2) | `127.0.0.1:18878` | MIT | `GET /health`, `POST /transcribe` (raw audio bytes → JSON) |
-| TTS | **Kokoro-82M** | `127.0.0.1:18901` | Apache-2.0 | `GET /health`, `POST /synthesize` (JSON → WAV/OGG) |
+| TTS | **VoxCPM2** primary, Kokoro degraded mode | `127.0.0.1:18901` | Apache-2.0 | `GET /health`, `POST /synthesize` (JSON -> WAV/OGG), `POST /stream` (JSON -> NDJSON PCM) |
 
 Both ports are JMCP-safe (never Jeryu-protected `2224/8787/8799/8929/18787/18788/19800`).
 
@@ -15,19 +15,21 @@ Both ports are JMCP-safe (never Jeryu-protected `2224/8787/8799/8929/18787/18788
 
 ```bash
 ./services/speech/run-asr.sh   # first run: venv + faster-whisper + distil-small.en
-./services/speech/run-tts.sh   # first run: venv(--system-site-packages) + Kokoro (~330MB)
+./services/speech/run-tts.sh   # first run: venv(--system-site-packages) + VoxCPM2/Kokoro weights
 ```
 
 Config via env (see each `run-*.sh`): `ASR_MODEL` (default `distil-small.en`),
 `ASR_DEVICE`/`ASR_COMPUTE` (`cuda`/`float16` on NVIDIA), `ASR_BEAM_SIZE`
-(default `1`), `TTS_VOICE` (default `af_heart`), `TTS_DEVICE` (`auto`). The
+(default `1`), `TTS_ENGINE` (`voxcpm2`), `TTS_VOICE` (`jmcp_male_v1`),
+`TTS_FALLBACK_ENGINE` (`kokoro`), `TTS_DEVICE` (`auto`). The
 venvs and downloaded models are git-ignored.
 
 ## Verified on this box (1× RTX 3090, 24 GB)
 
 - **ASR**: realtime profile is `distil-small.en` on CUDA float16 with beam 1,
   selected to keep first-audio latency low while sharing a 24 GB card with vLLM.
-- **TTS**: Kokoro on cuda, 24 kHz output.
+- **TTS**: VoxCPM2 on cuda, 48 kHz output, with `jmcp_male_v1` voice-design
+  profile and Kokoro as degraded mode.
 - **Round-trip** (the regression check, `selftest.sh`): TTS synthesizes
   *"Master control plane online. The autonomous dispatcher is running."* → ASR
   transcribes it back. Both sidecars are intended to co-reside with the 30B
@@ -60,7 +62,8 @@ rtk cargo run -p jmcpctl -- telegram voice-demo listen --reply-voice --seconds 6
 
 It reads the Telegram env file from `JMCP_TELEGRAM_ENV` (default
 `telegram.env`) and uses `JMCP_ASR_URL` / `JMCP_TTS_URL` for the local speech
-sidecars.
+sidecars. Telegram still uses `/synthesize?format=ogg`; cockpit live playback
+uses `/stream` through the voice gateway.
 
 ## Accuracy overrides
 

@@ -3,7 +3,8 @@ set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 default:
     @just --list
 
-fast: fast-shell fast-rust fast-python fast-actions
+fast:
+    bash ops/ci/fast.sh
 
 fast-shell:
     while IFS= read -r script; do bash -n "$script"; done < <(find scripts services ops/ci -type f -name '*.sh' | sort)
@@ -12,13 +13,23 @@ fast-rust:
     cargo fmt --all -- --check
     cargo check --workspace --all-targets --locked
 
+fast-voiced:
+    cargo check -p jmcp-voiced --all-targets --locked
+
+test-speech-fast:
+    if command -v cargo-nextest >/dev/null 2>&1; then cargo nextest run -p jmcp-adapter-speech --locked; else cargo test -p jmcp-adapter-speech --locked; fi
+
+build-timings:
+    cargo build --workspace --locked --timings
+
 fast-python:
-    while IFS= read -r file; do python3 -m py_compile "$file"; done < <(find services -type f -name '*.py' | sort)
+    while IFS= read -r file; do python3 -m py_compile "$file"; done < <(find services ops/ci \( -path '*/.venv' -o -path '*/.venv-*' -o -path '*/__pycache__' -o -path '*/models' \) -prune -o -type f -name '*.py' -print | sort)
 
 fast-actions:
     if command -v actionlint >/dev/null 2>&1; then actionlint; else echo "[jmcp-talk][warn] skipping actionlint: not installed" >&2; fi
 
-ci: fast test contract-drift
+ci:
+    bash ops/ci/ci.sh
 
 security: security-evidence
 
@@ -44,7 +55,7 @@ contract-drift:
 score: score-advisory
 
 score-advisory:
-    jankurai audit . --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md --score-history .jankurai/score-history.jsonl --score-history-csv .jankurai/score-history.csv
+    jankurai audit . --full --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md --score-history .jankurai/score-history.jsonl --score-history-csv .jankurai/score-history.csv
 
 proof-routing:
     jankurai proof . --changed-from "${JANKURAI_BASE_REF:-origin/main}" --out target/jankurai/proof-routing.json --md target/jankurai/proof-routing.md
@@ -83,12 +94,12 @@ release-readiness:
     bash ops/ci/release-readiness.sh
 
 authz-matrix:
-    jankurai audit . --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md
+    jankurai audit . --full --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md
 
 input-boundary:
-    jankurai audit . --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md
+    jankurai audit . --full --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md
 
 agent-tool-supply:
-    jankurai audit . --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md
+    jankurai audit . --full --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md
 
-check: fast build test contract-drift
+check: fast build test contract-drift security cost-budget release-readiness score

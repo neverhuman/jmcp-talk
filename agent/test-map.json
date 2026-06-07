@@ -2,8 +2,68 @@
   "version": 1,
   "workspace": "jmcp-talk",
   "tests": {
-    ".github/workflows/": {
+    ".editorconfig": {
       "command": "just fast",
+      "purpose": "verify repository editor policy stays parseable"
+    },
+    ".env.example": {
+      "command": "just fast",
+      "purpose": "verify sample environment config remains routed"
+    },
+    ".github/actionlint.yaml": {
+      "command": "just fast",
+      "purpose": "verify workflow lint configuration remains routed"
+    },
+    ".gitignore": {
+      "command": "just fast",
+      "purpose": "verify repository ignore policy"
+    },
+    ".npmrc": {
+      "command": "just fast",
+      "purpose": "verify npm configuration remains routed"
+    },
+    "AGENTS.md": {
+      "command": "just score",
+      "purpose": "verify root agent routing remains visible"
+    },
+    "CHANGELOG.md": {
+      "command": "just release-readiness",
+      "purpose": "verify changelog remains part of release evidence"
+    },
+    "CLAUDE.md": {
+      "command": "just score",
+      "purpose": "verify Claude-facing instructions remain routed"
+    },
+    "Cargo.lock": {
+      "command": "just fast",
+      "purpose": "verify Cargo lockfile remains routed"
+    },
+    "Cargo.toml": {
+      "command": "just fast",
+      "purpose": "verify Cargo workspace manifest remains routed"
+    },
+    "GEMINI.md": {
+      "command": "just score",
+      "purpose": "verify Gemini-facing instructions remain routed"
+    },
+    "Justfile": {
+      "command": "just fast",
+      "purpose": "verify local proof targets remain routed"
+    },
+    "README-jankurai-scaffold.md": {
+      "command": "just score",
+      "purpose": "verify Jankurai scaffold remains routed"
+    },
+    "README.md": {
+      "command": "just score",
+      "purpose": "verify README guidance remains routed"
+    },
+    "agent/": {
+      "command": "just score",
+      "purpose": "verify agent-readable manifests remain parseable"
+    },
+    ".github/workflows/": {
+      "command": "just security",
       "purpose": "verify public CI remains deterministic and GPU live stays dispatch-only"
     },
     ".jeryu/": {
@@ -18,6 +78,18 @@
       "command": "cargo test -p jmcp-speechd --locked",
       "purpose": "verify deterministic speech daemon health, metrics, and trace behavior"
     },
+    "apps/jmcp-voiced/": {
+      "command": "cargo test -p jmcp-voiced --locked",
+      "purpose": "verify voiced gateway and core turn evidence behavior"
+    },
+    "ci-fast-push.sh": {
+      "command": "just fast",
+      "purpose": "verify local fast-push helper remains shell-parseable"
+    },
+    "contracts/AGENTS.md": {
+      "command": "just score",
+      "purpose": "verify contract agent guidance remains routed"
+    },
     "contracts/speech/": {
       "command": "just contract-drift",
       "purpose": "verify speech OpenAPI contract routes and markers"
@@ -26,10 +98,41 @@
       "command": "cargo test -p jmcp-adapter-speech --locked",
       "purpose": "verify speech adapter env precedence and HTTP parsing"
     },
+    "db/": {
+      "command": "just score",
+      "purpose": "verify talk remains a non-database owner and durable truth stays in jmcp-core"
+    },
     "services/speech/": {
       "command": "just fast",
       "purpose": "verify speech sidecar scripts and Python syntax"
+    },
+    "docs/": {
+      "command": "just release-readiness",
+      "purpose": "verify documentation remains aligned with release proof"
+    },
+    "deny.toml": {
+      "command": "just security",
+      "purpose": "verify dependency policy remains routed"
+    },
+    "gitleaks.toml": {
+      "command": "just security",
+      "purpose": "verify secret-scanning policy remains routed"
+    },
+    "ops/": {
+      "command": "just fast",
+      "purpose": "verify local CI helpers remain shell-parseable"
+    },
+    "scripts/": {
+      "command": "just fast",
+      "purpose": "verify local CI entry points remain shell-parseable"
+    },
+    "rust-toolchain.toml": {
+      "command": "just fast",
+      "purpose": "verify Rust toolchain policy remains routed"
+    },
+    "services/llm/": {
+      "command": "just fast",
+      "purpose": "verify voice gateway scripts and Python syntax"
     }
   }
 }
-

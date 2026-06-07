@@ -1,0 +1,77 @@
+[stack]
+id = "rust-ts-vite-react-postgres-bounded-python"
+version = "0.4.0"
+
+[rust]
+adapter_paths = ["crates/jmcp-adapter-speech", "apps/jmcp-speechd", "apps/jmcp-voiced"]
+
+[python]
+allowed_truth_paths = ["python/ai-service", "services/llm", "services/speech"]
+allowed_non_product_paths = ["ops/ci", "services/llm/tests", "services/speech/tests"]
+sidecar_paths = ["services/llm", "services/speech"]
+forbidden_db_paths = ["services/llm", "services/speech"]
+
+[[python_sidecar_exception]]
+path = "services/llm"
+owner = "talk"
+classification = "bounded MiniCPM-o live voice sidecar"
+default_lane = "opt-in GPU/live only"
+expires = "2026-12-31"
+
+[[audited_runtime_boundary]]
+paths = ["services/llm"]
+runtime = "python"
+classification = "bounded MiniCPM-o live voice sidecar"
+product_surface = false
+target_stack_exception = true
+reclassifies = [
+  "python-direct-product-truth-or-db-ownership",
+  "non-optimal-product-language-found",
+  "too-much-python-in-product-surface",
+]
+proof_command = "python3 -m unittest discover -s services/llm/tests -p 'test_*.py'"
+rerun_command = "just gpu-live"
+required_evidence = ["target/jankurai/boundary-evidence/python-llm-sidecar.json"]
+required_checks = [
+  "no durable product truth or database ownership in the Python sidecar",
+  "Rust jmcp-voiced remains the default runtime entrypoint",
+  "MiniCPM-o Python lane is opt-in GPU/live only",
+]
+
+[[python_sidecar_exception]]
+path = "services/speech"
+owner = "talk"
+classification = "local deterministic ASR/TTS sidecar"
+default_lane = "deterministic local"
+expires = "2026-12-31"
+
+[[audited_runtime_boundary]]
+paths = ["services/speech"]
+runtime = "python"
+classification = "local deterministic ASR/TTS sidecar"
+product_surface = false
+target_stack_exception = true
+reclassifies = [
+  "python-direct-product-truth-or-db-ownership",
+  "non-optimal-product-language-found",
+  "too-much-python-in-product-surface",
+]
+proof_command = "python3 -m unittest discover -s services/speech/tests -p 'test_*.py'"
+rerun_command = "just fast-python"
+required_evidence = ["target/jankurai/boundary-evidence/python-speech-sidecar.json"]
+required_checks = [
+  "no durable product truth or database ownership in the Python sidecar",
+  "Rust adapter clients own product integration behavior",
+  "ASR/TTS Python files are deterministic local sidecars",
+]
+
+[authority]
+durable_approvals = "jmcp-core"
+tool_policy = "jmcp-core"
+ledgers = "jmcp-core"
+turn_state = "jmcp-core"
+
+[db]
+root_paths = ["db"]
+migration_paths = ["db/migrations"]
+constraint_paths = ["db/constraints"]

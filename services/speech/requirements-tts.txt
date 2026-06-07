@@ -1,6 +1,6 @@
-# JMCP TTS sidecar — great text-to-speech on the local GPU/CPU.
-# Kokoro-82M (Apache-2.0, weights + code) via the `kokoro` package. Phonemization
-# uses bundled espeak-ng (espeakng-loader), so no system package is required.
-# Reuses the system torch (create the venv with --system-site-packages).
+# JMCP TTS sidecar. VoxCPM2 is the default live cockpit voice; Kokoro remains
+# the emergency degraded mode. The venv reuses system torch via
+# --system-site-packages to avoid duplicate CUDA wheels.
+voxcpm>=2.0.0,<3
 kokoro==0.9.4
 soundfile==0.13.1

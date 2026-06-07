@@ -1,0 +1,15 @@
+system = "JMCP"
+version = 1
+
+[policy]
+default = "manual"
+generated_content_must_be_reproducible = true
+generated_content_requires_marker = true
+
+[[zone]]
+allowed = true
+command = "just contract-drift"
+kind = "http-contract"
+path = "contracts/speech/speech.openapi.yaml"
+required_marker = "Contract zone: verified by just contract-drift. Source: apps/jmcp-speechd + crates/jmcp-adapter-speech. DO NOT EDIT WITHOUT CONTRACT DRIFT."
+source = "apps/jmcp-speechd + crates/jmcp-adapter-speech -> contracts/speech/speech.openapi.yaml"

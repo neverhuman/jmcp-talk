@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Launch the JMCP local reasoning-model sidecar: vLLM serving an OpenAI-compatible
+# Launch the JMCP local text-model sidecar: vLLM serving an OpenAI-compatible
 # /v1 API on the GPU. This is the "brain" the voice loop and jnoccio route to.
 #
-# First run creates the venv + installs vLLM and downloads the model (~17GB for the
-# 30B-A3B AWQ) into the shared HF cache. Binds 127.0.0.1:18902 by default (a
+# First run creates the venv + installs vLLM and downloads the model into the
+# shared HF cache. Binds 127.0.0.1:18902 by default (a
 # JMCP-safe port, never a Jeryu-protected one). Weights + venv are git-ignored.
 #
-# Standalone defaults favor the 30B with a larger context. For Cockpit realtime
-# voice, use `services/llm/realtime-voice.sh`; it launches this script with
-# LLM_GPU_UTIL=0.80 and LLM_MAX_LEN=8192 so ASR/TTS can stay on CUDA.
+# Standalone defaults favor a smaller AWQ instruct model with a larger context.
+# For Cockpit realtime voice, use `services/llm/realtime-voice.sh`; it launches
+# this script with a VRAM budget sized to keep ASR/TTS on CUDA too.
 set -Eeuo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV="$HERE/.venv-llm"
@@ -25,8 +25,8 @@ fi
 # Put the venv's bin on PATH so vLLM/FlashInfer find `ninja` for JIT kernel builds.
 export PATH="$VENV/bin:$PATH"
 
-export LLM_MODEL="${LLM_MODEL:-cpatonn/Qwen3-30B-A3B-Instruct-2507-AWQ-4bit}"
-export LLM_SERVED_NAME="${LLM_SERVED_NAME:-local/qwen3-30b-a3b}"
+export LLM_MODEL="${LLM_MODEL:-Qwen/Qwen2.5-7B-Instruct-AWQ}"
+export LLM_SERVED_NAME="${LLM_SERVED_NAME:-local/qwen2.5-7b-instruct-awq}"
 export LLM_PORT="${LLM_PORT:-18902}"
 export LLM_GPU_UTIL="${LLM_GPU_UTIL:-0.92}"
 export LLM_MAX_LEN="${LLM_MAX_LEN:-32768}"

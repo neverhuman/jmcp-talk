@@ -1,0 +1,37 @@
+system = "JMCP"
+version = 1
+
+[[lane]]
+name = "fast"
+command = "just fast"
+purpose = "deterministic shell, Python syntax, Rust format, and Rust check"
+
+[[lane]]
+name = "test"
+command = "just test"
+purpose = "Rust workspace tests"
+
+[[lane]]
+name = "contract-drift"
+command = "just contract-drift"
+purpose = "speech OpenAPI route and marker drift"
+
+[[lane]]
+name = "security"
+command = "just security"
+purpose = "secret, dependency, SBOM, and workflow proof"
+
+[[lane]]
+name = "gpu-live"
+command = "just gpu-live"
+purpose = "opt-in MiniCPM-o GPU live dispatch"
+
+[[lane]]
+name = "audit"
+command = "just score"
+purpose = "Jankurai score artifacts"
+
+[[lane]]
+name = "release"
+command = "just check"
+purpose = "full merge gate"
