@@ -64,17 +64,28 @@ class TtsSidecarContractTest(unittest.TestCase):
 
     def test_voxcpm_max_len_uses_spoken_text_not_profile_prompt(self) -> None:
         short_cap = tts_sidecar.voxcpm_max_len("Ready.")
+        short_floor = tts_sidecar.voxcpm_min_len("Ready.")
         status_cap = tts_sidecar.voxcpm_max_len(
+            "Local voice is ready. ASR, reasoning, and VoxCPM2 speech are connected."
+        )
+        status_floor = tts_sidecar.voxcpm_min_len(
             "Local voice is ready. ASR, reasoning, and VoxCPM2 speech are connected."
         )
         prompted_cap = tts_sidecar.voxcpm_max_len(
             f"({tts_sidecar.load_voice_profile().design_prompt})"
             "Local voice is ready. ASR, reasoning, and VoxCPM2 speech are connected."
         )
+        prompted_floor = tts_sidecar.voxcpm_min_len(
+            f"({tts_sidecar.load_voice_profile().design_prompt})"
+            "Local voice is ready. ASR, reasoning, and VoxCPM2 speech are connected."
+        )
 
         self.assertEqual(short_cap, 6)
+        self.assertEqual(short_floor, 2)
         self.assertEqual(status_cap, 33)
+        self.assertEqual(status_floor, 22)
         self.assertGreater(prompted_cap, status_cap)
+        self.assertGreater(prompted_floor, status_floor)
 
     def test_voxcpm_render_sends_profile_text_with_spoken_cap(self) -> None:
         import numpy as np
@@ -93,6 +104,7 @@ class TtsSidecarContractTest(unittest.TestCase):
 
         self.assertIn("150 to 160 words per minute", pipeline.kwargs["text"])
         self.assertTrue(pipeline.kwargs["text"].endswith(text))
+        self.assertEqual(pipeline.kwargs["min_len"], 22)
         self.assertEqual(pipeline.kwargs["max_len"], 33)
 
 

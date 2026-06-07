@@ -48,6 +48,7 @@ MAX_LEADING_SILENCE_MS = float(os.environ.get("TTS_MAX_LEADING_SILENCE_MS", "80"
 MAX_INTERNAL_SILENCE_MS = float(os.environ.get("TTS_MAX_INTERNAL_SILENCE_MS", "120"))
 MAX_TRAILING_SILENCE_MS = float(os.environ.get("TTS_MAX_TRAILING_SILENCE_MS", "80"))
 VOXCPM_MIN_PACE_WPM = float(os.environ.get("TTS_VOXCPM_MIN_PACE_WPM", "125"))
+VOXCPM_MAX_PACE_WPM = float(os.environ.get("TTS_VOXCPM_MAX_PACE_WPM", "190"))
 VOXCPM_STREAM_FRAME_MS = float(os.environ.get("TTS_VOXCPM_STREAM_FRAME_MS", "160"))
 HERE = Path(__file__).resolve().parent
 VOICE_PROFILE_PATH = Path(
@@ -218,6 +219,13 @@ def voxcpm_max_len(text: str) -> int:
     return max(6, int(math.ceil(max_seconds / frame_seconds)))
 
 
+def voxcpm_min_len(text: str) -> int:
+    words = max(1, count_spoken_words(text))
+    min_seconds = words * 60.0 / VOXCPM_MAX_PACE_WPM
+    frame_seconds = VOXCPM_STREAM_FRAME_MS / 1000.0
+    return max(2, int(math.ceil(min_seconds / frame_seconds)))
+
+
 class SilenceShaper:
     def __init__(self, sample_rate: int) -> None:
         self.sample_rate = sample_rate
@@ -312,6 +320,7 @@ def render_pcm_chunks(
             "text": profile_text(text),
             "cfg_value": VOXCPM_CFG_VALUE,
             "inference_timesteps": VOXCPM_TIMESTEPS,
+            "min_len": voxcpm_min_len(text),
             "max_len": voxcpm_max_len(text),
         }
         if streaming:
