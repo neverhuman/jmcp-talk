@@ -900,7 +900,7 @@ async fn handle_tts_line(
         }
         if bool_field(&parsed, "degraded_active").unwrap_or(false) {
             let degraded_snapshot = update_turn_record(turn_record, |turn| {
-                turn.audio.degraded_voice = true;
+                turn.audio.fallback_voice = true;
                 if let Some(profile_hash) = string_field(&parsed, "voice_profile_hash") {
                     turn.audio.voice_profile_hash = Some(profile_hash);
                 }

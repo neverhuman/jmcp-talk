@@ -4,6 +4,6 @@
   "sample_rate": 48000,
   "provenance": "VoxCPM2 voice-design profile generated from a local text prompt only; no MiniCPM demo reference audio is used.",
   "license": "Apache-2.0",
-  "design_prompt": "A warm American male baritone engineering copilot voice, calm and human, close-mic studio quality, concise delivery, natural breath, steady pace, low fatigue, no announcer affect.",
+  "design_prompt": "A warm American male baritone engineering copilot voice, calm and human, close-mic studio quality, concise delivery at 150 to 160 words per minute, short natural pauses under 250 milliseconds, stable technical-term pronunciation, low fatigue, no announcer affect.",
   "created_at": "2026-06-06T00:00:00.000Z"
 }

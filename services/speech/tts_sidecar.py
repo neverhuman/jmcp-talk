@@ -17,7 +17,9 @@ import base64
 import hashlib
 import io
 import json
+import math
 import os
+import re
 import threading
 import time
 from dataclasses import dataclass
@@ -40,6 +42,13 @@ VOXCPM_TIMESTEPS = int(os.environ.get("TTS_VOXCPM_INFERENCE_TIMESTEPS", "10"))
 KOKORO_VOICE = os.environ.get("TTS_KOKORO_VOICE", "am_michael")
 KOKORO_SAMPLE_RATE = 24000
 VOXCPM_SAMPLE_RATE = 48000
+VOICE_SHAPING_ENABLED = os.environ.get("TTS_VOICE_SHAPING", "1") != "0"
+SILENCE_THRESHOLD = float(os.environ.get("TTS_SILENCE_THRESHOLD", "0.001"))
+MAX_LEADING_SILENCE_MS = float(os.environ.get("TTS_MAX_LEADING_SILENCE_MS", "80"))
+MAX_INTERNAL_SILENCE_MS = float(os.environ.get("TTS_MAX_INTERNAL_SILENCE_MS", "120"))
+MAX_TRAILING_SILENCE_MS = float(os.environ.get("TTS_MAX_TRAILING_SILENCE_MS", "80"))
+VOXCPM_MIN_PACE_WPM = float(os.environ.get("TTS_VOXCPM_MIN_PACE_WPM", "125"))
+VOXCPM_STREAM_FRAME_MS = float(os.environ.get("TTS_VOXCPM_STREAM_FRAME_MS", "160"))
 HERE = Path(__file__).resolve().parent
 VOICE_PROFILE_PATH = Path(
     os.environ.get(
@@ -194,6 +203,98 @@ def profile_text(text: str) -> str:
     return f"({profile.design_prompt}){clean}"
 
 
+def ms_to_samples(ms: float, sample_rate: int) -> int:
+    return max(0, int(round(sample_rate * ms / 1000.0)))
+
+
+def count_spoken_words(text: str) -> int:
+    return len(re.findall(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)?", text))
+
+
+def voxcpm_max_len(text: str) -> int:
+    words = max(1, count_spoken_words(text))
+    max_seconds = words * 60.0 / VOXCPM_MIN_PACE_WPM
+    frame_seconds = VOXCPM_STREAM_FRAME_MS / 1000.0
+    return max(6, int(math.ceil(max_seconds / frame_seconds)))
+
+
+class SilenceShaper:
+    def __init__(self, sample_rate: int) -> None:
+        self.sample_rate = sample_rate
+        self.leading_limit = ms_to_samples(MAX_LEADING_SILENCE_MS, sample_rate)
+        self.internal_limit = ms_to_samples(MAX_INTERNAL_SILENCE_MS, sample_rate)
+        self.trailing_limit = ms_to_samples(MAX_TRAILING_SILENCE_MS, sample_rate)
+        self.started = False
+        self.silence_buffer = None
+
+    def process(self, pcm: Any):
+        import numpy as np
+
+        data = np.asarray(pcm, dtype="float32").reshape(-1)
+        if data.size == 0:
+            return data
+        parts = []
+        start = 0
+        silent = np.abs(data) < SILENCE_THRESHOLD
+        while start < data.size:
+            run_silent = bool(silent[start])
+            end = start + 1
+            while end < data.size and bool(silent[end]) == run_silent:
+                end += 1
+            run = data[start:end]
+            if run_silent:
+                self._buffer_silence(run, np)
+            else:
+                buffered = self._take_silence(self.leading_limit if not self.started else self.internal_limit)
+                if buffered.size:
+                    parts.append(buffered)
+                self.started = True
+                parts.append(run)
+            start = end
+        if not parts:
+            return np.asarray([], dtype="float32")
+        return np.concatenate(parts).astype("float32", copy=False)
+
+    def finish(self):
+        tail = self._take_silence(self.trailing_limit if self.started else self.leading_limit)
+        self.silence_buffer = None
+        return tail
+
+    def _buffer_silence(self, run: Any, np: Any) -> None:
+        if self.silence_buffer is None or self.silence_buffer.size == 0:
+            buffered = run
+        else:
+            buffered = np.concatenate([self.silence_buffer, run])
+        limit = max(self.leading_limit, self.internal_limit, self.trailing_limit)
+        self.silence_buffer = buffered[-limit:] if limit and buffered.size > limit else buffered
+
+    def _take_silence(self, limit: int):
+        import numpy as np
+
+        if self.silence_buffer is None or self.silence_buffer.size == 0 or limit <= 0:
+            return np.asarray([], dtype="float32")
+        if self.silence_buffer.size <= limit:
+            selected = self.silence_buffer
+        else:
+            selected = self.silence_buffer[-limit:]
+        self.silence_buffer = None
+        return selected.astype("float32", copy=False)
+
+
+def shaped_pcm_chunks(chunks: Iterable[Any], sample_rate: int) -> Iterable[Any]:
+    if not VOICE_SHAPING_ENABLED:
+        yield from chunks
+        return
+    shaper = SilenceShaper(sample_rate)
+    for chunk in chunks:
+        shaped = shaper.process(chunk)
+        if getattr(shaped, "size", 0):
+            yield shaped
+    tail = shaper.finish()
+    if getattr(tail, "size", 0):
+        yield tail
+
+
 def render_pcm_chunks(
     engine: str,
     pipeline: Any,
@@ -201,6 +302,7 @@ def render_pcm_chunks(
     streaming: bool,
     voice: str | None = None,
     speed: float = 1.0,
+    sample_rate: int | None = None,
 ) -> Iterable[Any]:
     import numpy as np
 
@@ -210,12 +312,14 @@ def render_pcm_chunks(
             "text": profile_text(text),
             "cfg_value": VOXCPM_CFG_VALUE,
             "inference_timesteps": VOXCPM_TIMESTEPS,
+            "max_len": voxcpm_max_len(text),
         }
         if streaming:
-            for chunk in generate(**kwargs):
-                yield np.asarray(chunk, dtype="float32").reshape(-1)
+            chunks = (np.asarray(chunk, dtype="float32").reshape(-1) for chunk in generate(**kwargs))
+            yield from shaped_pcm_chunks(chunks, sample_rate or VOXCPM_SAMPLE_RATE)
         else:
-            yield np.asarray(generate(**kwargs), dtype="float32").reshape(-1)
+            chunks = [np.asarray(generate(**kwargs), dtype="float32").reshape(-1)]
+            yield from shaped_pcm_chunks(chunks, sample_rate or VOXCPM_SAMPLE_RATE)
         return
 
     if engine == "kokoro":
@@ -382,7 +486,17 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             started = time.monotonic()
-            chunks = list(render_pcm_chunks(engine, pipeline, text, streaming=False, voice=voice, speed=speed))
+            chunks = list(
+                render_pcm_chunks(
+                    engine,
+                    pipeline,
+                    text,
+                    streaming=False,
+                    voice=voice,
+                    speed=speed,
+                    sample_rate=sample_rate,
+                )
+            )
             import numpy as np
 
             pcm = np.concatenate(chunks) if chunks else np.zeros(1, dtype="float32")
@@ -428,7 +542,15 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("connection", "close")
         self.end_headers()
         try:
-            for pcm in render_pcm_chunks(engine, pipeline, text, streaming=True, voice=voice, speed=speed):
+            for pcm in render_pcm_chunks(
+                engine,
+                pipeline,
+                text,
+                streaming=True,
+                voice=voice,
+                speed=speed,
+                sample_rate=sample_rate,
+            ):
                 frame = pcm_frame(pcm, sample_rate, sequence, started, queue_depth_ms)
                 total_samples += int(len(pcm))
                 sequence += 1

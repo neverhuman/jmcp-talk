@@ -30,7 +30,7 @@ pub struct VoiceTurnAudio {
     pub output_hash: Option<String>,
     pub output_ref: Option<String>,
     pub output_sample_rate: Option<u32>,
-    pub degraded_voice: bool,
+    pub fallback_voice: bool,
     pub voice_profile_hash: Option<String>,
 }
 
@@ -268,6 +268,7 @@ mod tests {
             let rendered = serde_json::to_value(&snapshot).unwrap();
             assert_eq!(rendered["state"], serde_json::to_value(state).unwrap());
             assert!(rendered.get("audio").is_some());
+            assert_eq!(rendered["audio"]["fallbackVoice"], false);
             assert!(rendered.get("metrics").is_some());
         }
     }
@@ -345,6 +346,7 @@ mod tests {
 
         assert_eq!(captured.len(), 5);
         assert_eq!(captured[0]["state"], "started");
+        assert_eq!(captured[0]["audio"]["fallbackVoice"], false);
         assert_eq!(captured[1]["state"], "transcribed");
         assert!(captured[1]["confirmationEvidence"][0]["captured_at"].is_string());
         assert_eq!(captured[2]["state"], "reasoning_started");

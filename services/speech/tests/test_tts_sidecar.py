@@ -44,6 +44,57 @@ class TtsSidecarContractTest(unittest.TestCase):
 
         self.assertEqual(tts_sidecar.load_voice_profile(profile_path).profile_hash, expected)
 
+    def test_streaming_silence_shaper_caps_pause_runs(self) -> None:
+        import numpy as np
+
+        chunks = [
+            np.array([0.0] * 100 + [0.02] * 10 + [0.0] * 60, dtype="float32"),
+            np.array([0.0] * 140 + [0.03] * 10 + [0.0] * 100, dtype="float32"),
+        ]
+
+        shaped = list(tts_sidecar.shaped_pcm_chunks(chunks, sample_rate=1000))
+        samples = np.concatenate(shaped)
+
+        self.assertEqual(len(samples), 300)
+        self.assertTrue(np.all(np.abs(samples[:80]) < tts_sidecar.SILENCE_THRESHOLD))
+        self.assertTrue(np.all(np.abs(samples[80:90]) >= tts_sidecar.SILENCE_THRESHOLD))
+        self.assertTrue(np.all(np.abs(samples[90:210]) < tts_sidecar.SILENCE_THRESHOLD))
+        self.assertTrue(np.all(np.abs(samples[210:220]) >= tts_sidecar.SILENCE_THRESHOLD))
+        self.assertTrue(np.all(np.abs(samples[220:]) < tts_sidecar.SILENCE_THRESHOLD))
+
+    def test_voxcpm_max_len_uses_spoken_text_not_profile_prompt(self) -> None:
+        short_cap = tts_sidecar.voxcpm_max_len("Ready.")
+        status_cap = tts_sidecar.voxcpm_max_len(
+            "Local voice is ready. ASR, reasoning, and VoxCPM2 speech are connected."
+        )
+        prompted_cap = tts_sidecar.voxcpm_max_len(
+            f"({tts_sidecar.load_voice_profile().design_prompt})"
+            "Local voice is ready. ASR, reasoning, and VoxCPM2 speech are connected."
+        )
+
+        self.assertEqual(short_cap, 6)
+        self.assertEqual(status_cap, 33)
+        self.assertGreater(prompted_cap, status_cap)
+
+    def test_voxcpm_render_sends_profile_text_with_spoken_cap(self) -> None:
+        import numpy as np
+
+        class FakeVoxCpm:
+            kwargs = {}
+
+            def generate_streaming(self, **kwargs):
+                self.kwargs = kwargs
+                yield np.array([0.02] * 160, dtype="float32")
+
+        pipeline = FakeVoxCpm()
+        text = "Local voice is ready. ASR, reasoning, and VoxCPM2 speech are connected."
+
+        list(tts_sidecar.render_pcm_chunks("voxcpm2", pipeline, text, streaming=True, sample_rate=1000))
+
+        self.assertIn("150 to 160 words per minute", pipeline.kwargs["text"])
+        self.assertTrue(pipeline.kwargs["text"].endswith(text))
+        self.assertEqual(pipeline.kwargs["max_len"], 33)
+
 
 if __name__ == "__main__":
     unittest.main()
